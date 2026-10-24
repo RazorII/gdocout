@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gdocout report</title>
+<style>
+:root{--bg:#fff;--fg:#1d1d1f;--mut:#6e6e73;--line:#e3e3e8;--card:#f6f6f8;--hi:#eef3ff;--acc:#2f5bd3;
+--ok:#1f8a4c;--warn:#b26a00;--bad:#c62828;--info:#4a6fa5;--grey:#8a8a8e;--vio:#7a4fb5}
+@media (prefers-color-scheme:dark){:root{--bg:#161618;--fg:#ececf0;--mut:#9a9aa0;--line:#2c2c30;--card:#1f1f23;--hi:#1d2840;--acc:#7ea2ff;
+--ok:#4cc27e;--warn:#e0a040;--bad:#ff6b6b;--info:#86a8dd;--grey:#8e8e93;--vio:#b18ae6}}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--fg)}
+header{padding:18px 22px 8px}h1{font-size:20px;margin:0 0 4px}.sub{color:var(--mut);word-break:break-all}
+.banner{margin:10px 0 0;padding:8px 12px;border-radius:8px;background:var(--card);border-left:4px solid var(--warn)}
+.banner.done{border-color:var(--ok)}
+.cards{display:flex;flex-wrap:wrap;gap:8px;padding:8px 22px}
+.chip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:5px 11px;cursor:pointer;user-select:none;display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var(--fg)}
+.chip b{font-variant-numeric:tabular-nums}.chip.on{outline:2px solid var(--acc);background:var(--hi)}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+.stats{padding:0 22px 6px;color:var(--mut);font-size:13px}
+.layout{display:grid;grid-template-columns:280px 1fr;gap:0;border-top:1px solid var(--line)}
+@media (max-width:820px){.layout{grid-template-columns:minmax(0,1fr)}.tree{max-height:240px;border-right:0;border-bottom:1px solid var(--line)}}
+.tree{border-right:1px solid var(--line);padding:10px 6px 10px 12px;overflow:auto;max-height:calc(100vh - 120px);position:sticky;top:0}
+.tree .node{padding:2px 6px;border-radius:6px;cursor:pointer;white-space:nowrap;display:flex;gap:6px;align-items:center}
+.tree .node:hover{background:var(--card)}.tree .node.sel{background:var(--hi)}
+.tree .tw{width:14px;color:var(--mut);flex:none;text-align:center}.tree .nm{overflow:hidden;text-overflow:ellipsis}
+.tree .ct{margin-left:auto;color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}.tree .pb{color:var(--warn);font-size:12px}
+main{padding:10px 18px 30px;min-width:0}
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+input[type=search],select{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 9px}
+input[type=search]{min-width:240px;flex:1}
+label.tg{display:inline-flex;gap:5px;align-items:center;color:var(--mut);font-size:13px;cursor:pointer}
+button{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:8px;padding:6px 10px;cursor:pointer}
+button:hover{border-color:var(--acc)}
+.count{color:var(--mut);font-size:13px;margin:4px 0 8px}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--mut);font-weight:600;cursor:pointer;white-space:nowrap;position:sticky;top:0;background:var(--bg)}
+td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.st{display:inline-flex;gap:6px;align-items:center;white-space:nowrap;font-size:13px}
+.path{color:var(--mut);font-size:12px;word-break:break-all}.name{word-break:break-word}
+.det{font-size:13px}.det .w{color:var(--warn)}.facts{color:var(--mut);font-size:12px}
+a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
+.more{margin:12px 0;text-align:center}.empty{color:var(--mut);padding:30px;text-align:center}
+.help{color:var(--mut);font-size:12px;margin:0 22px 8px}
+kbd{border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:11px}
+td.file{min-width:190px}
+@media (max-width:820px){
+  header,.cards,.stats,.help{padding-left:14px;padding-right:14px}.help{margin-left:14px}
+  main{padding:10px 12px 30px}input[type=search]{min-width:0;flex:1 1 100%}select{max-width:100%;flex:1 1 40%}.banner,.sub{overflow-wrap:anywhere}
+  thead{display:none}table,tbody,tr,td{display:block;width:100%}
+  tr{border-bottom:1px solid var(--line);padding:10px 0}td{border:0;padding:2px 0;min-width:0}
+  td.num{text-align:left;color:var(--mut)}td.file{min-width:0}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>gdocout report</h1>
+  <div class="sub" id="sub"></div>
+  <div class="banner" id="banner"></div>
+</header>
+<div class="cards" id="cards"></div>
+<div class="stats" id="stats"></div>
+<p class="help">Click a status to show only those files, a folder on the left to narrow to it. Filters combine. <kbd>/</kbd> jumps to search. The address bar keeps the current filter, so a view can be bookmarked.</p>
+<div class="layout">
+  <nav class="tree" id="tree" aria-label="Folders"></nav>
+  <main>
+    <div class="filters">
+      <input type="search" id="q" placeholder="Search names and folders…" aria-label="Search">
+      <select id="origin" aria-label="Google or ordinary files">
+        <option value="">Google and ordinary files</option>
+        <option value="g">Google files only</option>
+        <option value="f">Ordinary files only</option>
+      </select>
+      <select id="type" aria-label="File type"></select>
+      <select id="ext" aria-label="Extension"></select>
+      <label class="tg"><input type="checkbox" id="sub_on" checked> include subfolders</label>
+      <label class="tg"><input type="checkbox" id="renamed"> renamed only</label>
+      <label class="tg"><input type="checkbox" id="warned"> with warnings only</label>
+      <label class="tg"><input type="checkbox" id="problems"> needs attention only</label>
+      <button id="reset">Clear filters</button>
+      <button id="csv">Download list (CSV)</button>
+      <button id="links">Copy Google links</button>
+    </div>
+    <div class="count" id="count"></div>
+    <table>
+      <thead><tr>
+        <th data-sort="st">Status</th><th data-sort="p">File</th><th data-sort="t">Type</th>
+        <th data-sort="s" class="num">Size</th><th data-sort="o">Saved as</th><th>Details</th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="more" id="more"></div>
+  </main>
+</div>
+<script id="data" type="application/json">/*__GDOCOUT_DATA__*/{}</script>
+<script>
+(function(){
+"use strict";
+const D = JSON.parse(document.getElementById("data").textContent);
+const S = D.summary || {}, L = D.labels || {}, X = D.explain || {}, K = D.kinds || {};
+const ROWS = D.rows || [];
+const ATTN = new Set(["download_off","not_shared","not_found","no_offline_format","not_on_disk","unreadable","failed","pending","source_gone"]);
+const COLOR = {converted:"--ok",copied:"--ok",download_off:"--warn",not_shared:"--warn",not_found:"--bad",no_offline_format:"--vio",
+  not_on_disk:"--info",unreadable:"--bad",failed:"--bad",pending:"--grey",source_gone:"--grey",ignored:"--grey"};
+const ORDER = Object.keys(L);
+const GROUPS = {
+  "Documents":[".doc",".docx",".odt",".rtf",".pages",".dotx",".wpd"],
+  "Spreadsheets":[".xls",".xlsx",".xlsm",".ods",".csv",".tsv",".numbers"],
+  "Presentations":[".ppt",".pptx",".odp",".key"],
+  "PDFs":[".pdf"],
+  "Images":[".jpg",".jpeg",".png",".gif",".heic",".heif",".webp",".tif",".tiff",".bmp",".svg",".raw",".cr2",".nef",".arw",".dng",".psd",".ai"],
+  "Video":[".mp4",".mov",".m4v",".avi",".mkv",".wmv",".webm",".3gp",".mts"],
+  "Audio":[".mp3",".m4a",".wav",".aac",".flac",".ogg",".aiff",".wma",".opus"],
+  "Archives":[".zip",".rar",".7z",".gz",".tar",".tgz",".bz2",".xz",".dmg",".iso"],
+  "Text & code":[".txt",".md",".json",".xml",".html",".htm",".css",".js",".py",".log",".yml",".yaml",".ini"],
+  "Ebooks":[".epub",".mobi",".azw",".azw3"],
+  "Maps":[".kml",".kmz",".gpx"]
+};
+const EXT2GROUP = {}; for (const g in GROUPS) for (const e of GROUPS[g]) EXT2GROUP[e] = g;
+function typeOf(r){ return r.k !== "file" ? (K[r.k] || "Google file") : (EXT2GROUP[r.x] || "Other files"); }
+for (const r of ROWS){ r.sz = r.k === "file" ? r.s : r.os; r.t = typeOf(r); r.d = r.p.includes("/") ? r.p.slice(0, r.p.lastIndexOf("/")) : ""; r.n0 = r.p.slice(r.p.lastIndexOf("/")+1); r.lc = r.p.toLowerCase(); }
+
+const $ = id => document.getElementById(id);
+function el(tag, attrs, ...kids){ const n = document.createElement(tag); if (attrs) for (const k in attrs){ if (k === "class") n.className = attrs[k]; else if (k === "style") n.style.cssText = attrs[k]; else n.setAttribute(k, attrs[k]); } for (const c of kids) if (c != null) n.append(c.nodeType ? c : String(c)); return n; }
+function size(n){ if (n == null) return ""; const u = ["B","KB","MB","GB","TB"]; let i = 0; while (n >= 1024 && i < 4){ n /= 1024; i++; } return (i ? n.toFixed(1) : n) + " " + u[i]; }
+function dot(st){ return el("span",{class:"dot",style:"background:var("+(COLOR[st]||"--grey")+")"}); }
+function hrefRel(p){ return p.split("/").map(encodeURIComponent).join("/"); }
+function fileUrl(abs){ let p = abs.replace(/\\/g,"/"); if (!p.startsWith("/")) p = "/" + p; return "file://" + p.split("/").map((s,i)=> (i===1 && /^[A-Za-z]:$/.test(s)) ? s : encodeURIComponent(s)).join("/"); }
+
+// header
+$("sub").textContent = (S.source||"") + "  →  " + (S.dest||"") + "   ·   " + (S.layout||"") + "   ·   gdocout " + (S.version||"") + "   ·   updated " + (S.updated||"");
+const ban = $("banner");
+if (S.stopped){ ban.textContent = S.stopped; }
+else if (S.finished){ ban.textContent = "Finished. Every file has been dealt with; the ones that need you are under the amber and red statuses."; ban.classList.add("done"); }
+else { ban.textContent = "Not finished: some files are still waiting. Running the same gdocout command again continues."; }
+const tr = S.this_run || {};
+const bits = [];
+bits.push((S.files||ROWS.length) + " files");
+if (S.bytes_written) bits.push(size(S.bytes_written) + " written");
+if (tr.downloads_per_minute) bits.push("last run: " + tr.downloads_per_minute + " downloads a minute, up to " + tr.most_at_once + " at once");
+if (tr.pauses) bits.push(tr.pauses + " pause" + (tr.pauses>1?"s":"") + " when Google asked to slow down (" + tr.paused_seconds + " s)");
+if (S.renamed) bits.push(S.renamed + " renamed to avoid a clash");
+$("stats").textContent = bits.join("  ·  ");
+
+// status chips
+const counts = {}; for (const r of ROWS) counts[r.st] = (counts[r.st]||0) + 1;
+const state = {st:new Set(), dir:null, q:"", origin:"", type:"", ext:"", sub:true, renamed:false, warned:false, problems:false, sort:"p", dir_:1, shown:300};
+const cards = $("cards");
+for (const st of ORDER){ if (!counts[st]) continue;
+  const c = el("span",{class:"chip",title:X[st]||"", "data-st":st}, dot(st), L[st], el("b",null,String(counts[st])));
+  c.onclick = () => { state.st.has(st) ? state.st.delete(st) : state.st.add(st); c.classList.toggle("on"); state.shown = 300; render(); save(); };
+  cards.append(c); }
+
+// type and extension selects
+function fillSelect(sel, first, values){ sel.append(el("option",{value:""},first)); for (const [v,lab] of values) sel.append(el("option",{value:v},lab)); }
+const typeCounts = {}; for (const r of ROWS) typeCounts[r.t] = (typeCounts[r.t]||0)+1;
+fillSelect($("type"), "Any type", Object.keys(typeCounts).sort().map(t => [t, t + " (" + typeCounts[t] + ")"]));
+const extCounts = {}; for (const r of ROWS) if (r.x) extCounts[r.x] = (extCounts[r.x]||0)+1;
+fillSelect($("ext"), "Any extension", Object.keys(extCounts).sort().map(x => [x, x + " (" + extCounts[x] + ")"]));
+
+// folder tree
+const root = {name:"All folders", path:"", kids:new Map(), n:0, bad:0};
+for (const r of ROWS){ let node = root; node.n++; if (ATTN.has(r.st)) node.bad++;
+  if (!r.d) continue; let acc = "";
+  for (const part of r.d.split("/")){ acc = acc ? acc + "/" + part : part;
+    if (!node.kids.has(part)) node.kids.set(part, {name:part, path:acc, kids:new Map(), n:0, bad:0});
+    node = node.kids.get(part); node.n++; if (ATTN.has(r.st)) node.bad++; } }
+const open = new Set([""]);
+function drawTree(){ const t = $("tree"); t.textContent = "";
+  (function walk(node, depth){
+    const has = node.kids.size > 0, isOpen = open.has(node.path);
+    const row = el("div",{class:"node" + (state.dir === node.path || (state.dir === null && node.path === "") ? " sel" : ""), style:"padding-left:" + (6 + depth*14) + "px", title:node.path || "All folders"},
+      el("span",{class:"tw"}, has ? (isOpen ? "▾" : "▸") : ""), el("span",{class:"nm"}, node.name),
+      node.bad ? el("span",{class:"pb", title:"files that need attention"}, "● " + node.bad) : null, el("span",{class:"ct"}, String(node.n)));
+    row.onclick = ev => { if (has && (ev.target.className === "tw" || state.dir === node.path)) { isOpen ? open.delete(node.path) : open.add(node.path); }
+      else { state.dir = node.path === "" ? null : node.path; open.add(node.path); } state.shown = 300; drawTree(); render(); save(); };
+    t.append(row);
+    if (has && isOpen) for (const k of [...node.kids.values()].sort((a,b)=>a.name.localeCompare(b.name))) walk(k, depth+1);
+  })(root, 0); }
+
+// filtering, sorting, rendering
+function match(r){
+  if (state.st.size && !state.st.has(r.st)) return false;
+  if (state.dir !== null){ if (state.sub ? !(r.d === state.dir || r.d.startsWith(state.dir + "/")) : r.d !== state.dir) return false; }
+  if (state.origin === "g" && r.k === "file") return false;
+  if (state.origin === "f" && r.k !== "file") return false;
+  if (state.type && r.t !== state.type) return false;
+  if (state.ext && r.x !== state.ext) return false;
+  if (state.renamed && !r.r) return false;
+  if (state.warned && !(r.w && r.w.length)) return false;
+  if (state.problems && !ATTN.has(r.st)) return false;
+  if (state.q){ for (const w of state.q.split(/\s+/)) if (w && !r.lc.includes(w) && !(r.o||"").toLowerCase().includes(w)) return false; }
+  return true; }
+function sorter(){ const k = state.sort, d = state.dir_;
+  if (k === "s") return (a,b) => d * ((a.sz||0) - (b.sz||0));
+  if (k === "st") return (a,b) => d * (ORDER.indexOf(a.st) - ORDER.indexOf(b.st)) || a.lc.localeCompare(b.lc);
+  return (a,b) => d * String(a[k]||"").localeCompare(String(b[k]||""), undefined, {numeric:true, sensitivity:"base"}); }
+let current = [];
+function render(){
+  current = ROWS.filter(match).sort(sorter());
+  $("count").textContent = current.length === ROWS.length ? "Showing all " + ROWS.length + " files" : "Showing " + current.length + " of " + ROWS.length + " files";
+  const body = $("rows"); body.textContent = "";
+  if (!current.length){ body.append(el("tr",null, el("td",{colspan:"6",class:"empty"},"No files match these filters."))); $("more").textContent = ""; return; }
+  const frag = document.createDocumentFragment();
+  for (const r of current.slice(0, state.shown)) frag.append(rowEl(r));
+  body.append(frag);
+  const more = $("more"); more.textContent = "";
+  if (current.length > state.shown){ const b = el("button",null,"Show " + Math.min(500, current.length - state.shown) + " more (" + (current.length - state.shown) + " left)"); b.onclick = () => { state.shown += 500; render(); }; more.append(b); }
+}
+function rowEl(r){
+  const st = el("span",{class:"st", title:X[r.st]||""}, dot(r.st), L[r.st]||r.st);
+  const name = el("div",{class:"name"}, r.n0);
+  const file = el("td",{class:"file"}, name, r.d ? el("div",{class:"path"}, r.d) : null);
+  if (S.source){ name.append(" "); name.append(el("a",{href:fileUrl(S.source + "/" + r.p), title:"open the original"}, "↗")); }
+  const out = el("td",null);
+  if (r.o && (r.st === "converted" || r.st === "copied")){ out.append(el("a",{href:hrefRel(r.o)}, r.o.slice(r.o.lastIndexOf("/")+1))); if (r.r) out.append(el("div",{class:"path"},"renamed to avoid a clash")); }
+  else if (r.o && r.st === "pending") out.append(el("span",{class:"path"}, "will be " + r.o.slice(r.o.lastIndexOf("/")+1)));
+  if (r.l) out.append(el("div",null, el("a",{href:hrefRel(r.l), title:"a small page in the copy that links to the Google file"}, "link page")));
+  const det = el("td",{class:"det"});
+  if (r.n) det.append(el("div",null,r.n));
+  if (r.w) for (const w of r.w) det.append(el("div",{class:"w"},"⚠︎ " + w));
+  const f = r.f || {}, fx = [];
+  if (f.words != null) fx.push(f.words + " words"); if (f.images) fx.push(f.images + " pictures");
+  if (f.sheets != null) fx.push(f.sheets + " sheet" + (f.sheets===1?"":"s") + (f.sheet_names ? ": " + f.sheet_names.join(", ") : ""));
+  if (f.slides != null) fx.push(f.slides + " slides"); if (f.pages) fx.push(f.pages + " pages"); if (f.placemarks != null) fx.push(f.placemarks + " places");
+  if (r.h) fx.push("SHA-256 " + r.h.slice(0,12) + "…");
+  if (fx.length) det.append(el("div",{class:"facts"}, fx.join(" · ")));
+  if (r.u) det.append(el("div",null, el("a",{href:r.u, target:"_blank", rel:"noopener noreferrer"}, "open in Google")));
+  return el("tr",null, el("td",null,st), file, el("td",null, r.t + (r.fm && r.k !== "file" ? " → ." + r.fm : "")), el("td",{class:"num"}, size(r.sz)), out, det);
+}
+
+// controls
+const q = $("q"); let qt;
+q.oninput = () => { clearTimeout(qt); qt = setTimeout(() => { state.q = q.value.trim().toLowerCase(); state.shown = 300; render(); save(); }, 150); };
+for (const [id, key] of [["origin","origin"],["type","type"],["ext","ext"]]) $(id).onchange = e => { state[key] = e.target.value; state.shown = 300; render(); save(); };
+for (const [id, key] of [["sub_on","sub"],["renamed","renamed"],["warned","warned"],["problems","problems"]]) $(id).onchange = e => { state[key] = e.target.checked; state.shown = 300; render(); save(); };
+document.querySelectorAll("th[data-sort]").forEach(th => th.onclick = () => { const k = th.dataset.sort; state.dir_ = state.sort === k ? -state.dir_ : 1; state.sort = k; render(); save(); });
+$("reset").onclick = () => { Object.assign(state, {st:new Set(), dir:null, q:"", origin:"", type:"", ext:"", sub:true, renamed:false, warned:false, problems:false, shown:300}); syncControls(); drawTree(); render(); save(); };
+document.addEventListener("keydown", e => { if (e.key === "/" && document.activeElement !== q){ e.preventDefault(); q.focus(); } });
+function csvCell(v){ v = v == null ? "" : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; }
+$("csv").onclick = () => {
+  const head = ["status","file","folder","type","size_bytes","saved_as","renamed","details","warnings","google_link"];
+  const lines = [head.join(",")].concat(current.map(r => [L[r.st]||r.st, r.n0, r.d, r.t, r.s, r.o && (r.st==="converted"||r.st==="copied") ? r.o : "", r.r ? "yes" : "", r.n||"", (r.w||[]).join("; "), r.u||""].map(csvCell).join(",")));
+  const a = el("a",{href:URL.createObjectURL(new Blob(["﻿" + lines.join("\n")],{type:"text/csv"})), download:"gdocout-files.csv"}); document.body.append(a); a.click(); a.remove(); };
+$("links").onclick = async () => { const text = current.filter(r => r.u).map(r => r.p + "\t" + r.u).join("\n");
+  if (!text){ alert("None of the files shown is a Google file."); return; }
+  try { await navigator.clipboard.writeText(text); alert("Copied " + text.split("\n").length + " Google links, one per line with their names."); }
+  catch(e){ prompt("Copy these links:", text); } };
+
+// keep the view in the address bar
+function save(){ const p = new URLSearchParams();
+  if (state.st.size) p.set("st", [...state.st].join(",")); if (state.dir !== null) p.set("dir", state.dir); if (state.q) p.set("q", state.q);
+  for (const k of ["origin","type","ext"]) if (state[k]) p.set(k, state[k]);
+  if (!state.sub) p.set("sub","0"); for (const k of ["renamed","warned","problems"]) if (state[k]) p.set(k,"1");
+  if (state.sort !== "p" || state.dir_ !== 1) p.set("sort", (state.dir_ < 0 ? "-" : "") + state.sort);
+  history.replaceState(null, "", "#" + p.toString()); }
+function load(){ const p = new URLSearchParams(location.hash.slice(1));
+  if (p.get("st")) state.st = new Set(p.get("st").split(",")); if (p.has("dir")) state.dir = p.get("dir"); state.q = p.get("q") || "";
+  for (const k of ["origin","type","ext"]) state[k] = p.get(k) || ""; state.sub = p.get("sub") !== "0";
+  for (const k of ["renamed","warned","problems"]) state[k] = p.get(k) === "1";
+  const s = p.get("sort"); if (s){ state.dir_ = s.startsWith("-") ? -1 : 1; state.sort = s.replace(/^-/,""); }
+  if (state.dir) { let acc = ""; for (const part of state.dir.split("/")) { acc = acc ? acc + "/" + part : part; open.add(acc); } } }
+function syncControls(){ q.value = state.q; $("origin").value = state.origin; $("type").value = state.type; $("ext").value = state.ext;
+  $("sub_on").checked = state.sub; $("renamed").checked = state.renamed; $("warned").checked = state.warned; $("problems").checked = state.problems;
+  document.querySelectorAll(".chip").forEach(c => c.classList.toggle("on", state.st.has(c.dataset.st))); }
+load(); syncControls(); drawTree(); render();
+})();
+</script>
+</body>
+</html>

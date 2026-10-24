@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gdocout"
+dynamic = ["version"]
+description = "Turn Google Docs, Sheets and Slides into Word, Excel and PowerPoint files without signing in, one link or a whole offline Google Drive folder at a time."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "RazorII" }]
+keywords = ["google-docs", "google-drive", "docx", "xlsx", "pptx", "export", "offline", "backup"]
+classifiers = [
+  "Environment :: Console",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Topic :: Office/Business :: Office Suites",
+  "Topic :: System :: Archiving :: Backup",
+]
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+gdocout = "gdocout.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/RazorII/gdocout"
+Issues = "https://github.com/RazorII/gdocout/issues"
+
+[tool.hatch.version]
+path = "src/gdocout/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gdocout"]
+
+[tool.hatch.build.targets.sdist]
+exclude = ["/.github", "/claude-plugin"]
+
+[tool.pytest.ini_options]
+markers = ["network: talks to Google (skipped unless GDOCOUT_NETWORK_TESTS=1)"]
