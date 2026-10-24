@@ -2,14 +2,24 @@
   "name": "gdocout",
   "displayName": "gdocout",
   "version": "0.1.0",
-  "description": "Turn Google Docs, Sheets and Slides into Word, Excel and PowerPoint files without signing in: one link, or a whole Google Drive saved offline, with a filterable report of every file and why any couldn't be saved.",
+  "description": "Turn Google Docs, Sheets and Slides into Word, Excel and PowerPoint files without giving anything your Google password: one link, or a whole Google Drive saved offline, with a filterable report of every file and why any couldn't be saved.",
   "author": {
     "name": "RazorII",
     "url": "https://github.com/RazorII"
   },
   "homepage": "https://github.com/RazorII/gdocout",
   "repository": "https://github.com/RazorII/gdocout",
+  "documentationUrl": "https://github.com/RazorII/gdocout#readme",
   "license": "MIT",
-  "keywords": ["google-docs", "google-drive", "docx", "xlsx", "pptx", "offline", "export", "backup"],
+  "keywords": [
+    "google-docs",
+    "google-drive",
+    "docx",
+    "xlsx",
+    "pptx",
+    "offline",
+    "export",
+    "backup"
+  ],
   "privacyPolicyUrl": "https://github.com/RazorII/gdocout/blob/main/PRIVACY.md"
 }
