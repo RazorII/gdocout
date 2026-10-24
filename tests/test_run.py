@@ -59,14 +59,14 @@ def test_full_run(library, tmp_path, fake_google):
     # link pages stand in for what couldn't be saved, and only for those
     assert (dest / "Work/Locked (Google Docs link).html").exists()
     assert (dest / "Work/Secret (Google Docs link).html").exists()
-    assert "no download of a form" in (dest / "Old/Survey (Google Forms link).html").read_text()
+    assert "no download of a form" in (dest / "Old/Survey (Google Forms link).html").read_text(encoding="utf-8")
     assert not list(dest.rglob("Deleted*"))
     # nothing half-written is left behind
     assert not list(dest.rglob("*" + fetch.PARTIAL))
     # report, manifest, summary
-    html = (dest / "gdocout-report.html").read_text()
+    html = (dest / "gdocout-report.html").read_text(encoding="utf-8")
     assert "Work/Locked.gdoc" in html and "/*__GDOCOUT_DATA__*/" not in html
-    lines = (dest / ".gdocout/files.jsonl").read_text().splitlines()
+    lines = (dest / ".gdocout/files.jsonl").read_text(encoding="utf-8").splitlines()
     assert len(lines) == 12 and all(json.loads(x)["rel"] for x in lines)
     assert s["attention"]["download_off"]["examples"] == ["Work/Locked.gdoc"]
     assert s["attention"]["not_shared"]["examples"] == ["Work/Secret.gdoc"]
@@ -159,7 +159,7 @@ def test_403_is_not_called_download_off(tmp_path, fake_google):
     stub(src / "a.gdoc", "forbid1aaaaaa")
     res = run.copy_library(options(src, tmp_path / "Copy", fake_google))
     assert res.code == run.EXIT_FAILED and res.summary["counts"] == {"failed": 1}
-    row = json.loads((tmp_path / "Copy/.gdocout/files.jsonl").read_text())
+    row = json.loads((tmp_path / "Copy/.gdocout/files.jsonl").read_text(encoding="utf-8"))
     assert "403" in row["note"] and "Download quota exceeded" in row["note"]
 
 
@@ -170,7 +170,7 @@ def test_web_page_instead_of_a_file_is_never_kept(tmp_path, fake_google):
     res = run.copy_library(options(src, dest, fake_google))
     assert res.summary["counts"] == {"failed": 1}
     assert not (dest / "a.docx").exists()
-    row = json.loads((dest / ".gdocout/files.jsonl").read_text())
+    row = json.loads((dest / ".gdocout/files.jsonl").read_text(encoding="utf-8"))
     assert "web page" in row["note"] and "Something odd" in row["note"]
 
 

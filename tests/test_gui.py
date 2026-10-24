@@ -139,7 +139,8 @@ def test_bad_choices_come_back_as_messages(server):
 def test_native_folder_dialog_per_system(monkeypatch, tmp_path):
     monkeypatch.setattr(gui.sys, "platform", "darwin")
     cmd = gui.native_picker_command('Pick "this"', str(tmp_path))
-    assert cmd[0] == "osascript" and 'choose folder with prompt "Pick \\"this\\""' in cmd[-1] and str(tmp_path) in cmd[-1]
+    assert cmd[0] == "osascript" and 'choose folder with prompt "Pick \\"this\\""' in cmd[-1]
+    assert gui._applescript_str(str(tmp_path)) in cmd[-1]  # the start folder, escaped as AppleScript wants
     monkeypatch.setattr(gui.sys, "platform", "linux")
     monkeypatch.setattr(gui.os, "name", "nt")
     cmd = gui.native_picker_command("It's mine")
@@ -197,6 +198,6 @@ def test_icon_is_in_the_report_and_survives_a_tricky_name(tmp_path):
     from gdocout import report
     from gdocout.model import Entry
     out = report.write(tmp_path / "r.html", [Entry("__GDOCOUT_ICON__.txt", "file", ".txt", status="copied")], {})
-    html = out.read_text()
+    html = out.read_text(encoding="utf-8")
     data = html.split('<script id="data" type="application/json">', 1)[1].split("</script>", 1)[0]
     assert json.loads(data)["rows"][0]["p"] == "__GDOCOUT_ICON__.txt" and html.count("<svg") == 1

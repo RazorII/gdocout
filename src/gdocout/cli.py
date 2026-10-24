@@ -98,7 +98,20 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _utf8_output() -> None:
+    """Write UTF-8 even where the system default is older (Windows sends piped output as cp1252),
+    so a file name in Thai or with an emoji can't crash a run whose output goes to Claude or a log."""
+    for stream in (sys.stdout, sys.stderr):
+        enc = (getattr(stream, "encoding", None) or "").lower().replace("-", "")
+        if enc != "utf8" and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                pass
+
+
 def main(argv: Optional[List[str]] = None) -> int:
+    _utf8_output()
     p = build_parser()
     args = p.parse_args(argv)
     if not args.cmd:
