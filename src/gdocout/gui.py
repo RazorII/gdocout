@@ -103,6 +103,12 @@ def form_to_argv(form: Dict[str, object], command: str = "copy") -> List[str]:
             argv.append("--recheck")
         if form.get("links") is False:
             argv.append("--no-links")
+        if form.get("fetch_placeholders"):
+            argv.append("--fetch-placeholders")
+        if form.get("use_browser"):
+            argv += ["--browser", str(form.get("browser") or "default")]
+            if str(form.get("downloads") or "").strip():
+                argv += ["--downloads", str(form["downloads"]).strip()]
         mw = int(form.get("max_workers") or 8)
         if mw != 8:
             argv += ["--max-workers", str(max(1, min(mw, 16)))]

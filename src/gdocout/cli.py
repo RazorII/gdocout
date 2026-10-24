@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from . import __version__, fetch, google, inventory, report, run
+from . import __version__, browser, fetch, google, inventory, report, run, validate
 from .inventory import REPORT_NAME, STATE_DIR
 from .model import CONVERTED, LABELS, Entry
 from .selection import Selection, parse_types, read_list
@@ -69,6 +69,9 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--limit", type=int, metavar="N", help="download at most N Google files this run (a sample, to check sharing first)")
     c.add_argument("--recheck", action="store_true", help="ask Google again about files it refused before (after an owner changed sharing)")
     c.add_argument("--no-links", action="store_true", help="don't leave a link page where a Google file couldn't be saved")
+    c.add_argument("--fetch-placeholders", action="store_true", help="ask Google Drive to download files that are only placeholders on this computer (Drive must be running and signed in)")
+    c.add_argument("--browser", nargs="?", const="default", choices=["default", *browser.BROWSERS], help="for files that aren't shared by link: download them through your web browser, signed in to Google with an account that can open them (recommended: the account Google Drive uses). Optionally name the browser")
+    c.add_argument("--downloads", type=Path, metavar="DIR", help="where that browser saves downloads (found automatically)")
     c.add_argument("--max-workers", type=int, default=8, metavar="N", help="most downloads at once (default 8; gdocout starts lower and works up)")
     c.add_argument("--json", action="store_true", help="print the summary as JSON")
 
@@ -81,6 +84,9 @@ def build_parser() -> argparse.ArgumentParser:
     ln.add_argument("--dest", type=Path, required=True, help="folder to save into")
     ln.add_argument("--format", action="append", default=[], metavar="FMT[,FMT] or KIND=FMT[,FMT]", help="e.g. pdf, docx,pdf or document=pdf")
     ln.add_argument("--pdf", choices=["also", "only"], help="also save a PDF, or only a PDF")
+    ln.add_argument("--browser", nargs="?", const="default", choices=["default", *browser.BROWSERS], help="for files that aren't shared by link: download them through your web browser, signed in to Google with an account that can open them (recommended: the account Google Drive uses). Optionally name the browser")
+    ln.add_argument("--account", metavar="EMAIL", default="", help="with --browser: the Google account in the browser that can open the files")
+    ln.add_argument("--downloads", type=Path, metavar="DIR", help="where that browser saves downloads (found automatically)")
     ln.add_argument("--json", action="store_true")
 
     g = sub.add_parser("gui", help="open a window in your web browser with every option")
@@ -171,6 +177,7 @@ def options_from_args(args) -> run.Options:
         source=args.source, dest=args.dest, flat=args.flat,
         formats=parse_formats(args.format, args.pdf), selection=selection_from_args(args),
         limit=args.limit, recheck=args.recheck, links=not args.no_links,
+        fetch_placeholders=args.fetch_placeholders, browser=args.browser, downloads=args.downloads,
         max_workers=max(1, min(args.max_workers, 16)),
     )
 
@@ -247,7 +254,7 @@ def _link(args) -> int:
     http = fetch.Http()
     results, code = [], 0
     for url in args.urls:
-        for res in _one_link(http, url, dest, formats):
+        for res in _one_link(http, url, dest, formats, args):
             results.append(res)
             if res["status"] != CONVERTED:
                 code = 1
@@ -259,7 +266,7 @@ def _link(args) -> int:
     return code
 
 
-def _one_link(http: fetch.Http, url: str, dest: Path, formats: Dict[str, List[str]]) -> List[Dict[str, object]]:
+def _one_link(http: fetch.Http, url: str, dest: Path, formats: Dict[str, List[str]], args=None) -> List[Dict[str, object]]:
     parsed = google.parse_link(url)
     if not parsed:
         return [{"url": url, "status": "failed", "note": "not a Google Docs, Sheets, Slides, Drawings or My Maps link"}]
@@ -281,12 +288,39 @@ def _one_link(http: fetch.Http, url: str, dest: Path, formats: Dict[str, List[st
                 out_list.append({"url": url, "status": CONVERTED, "kind": kind.label, "format": fmt, "file": str(final),
                                  "facts": out.facts, "warnings": out.warnings})
                 continue
+            if args is not None and getattr(args, "browser", None) and out.status in ("not_shared", "download_off"):
+                got = _link_via_browser(kind, gid, key, fmt, dest, args)
+                if got.get("status") == CONVERTED:
+                    out_list.append({"url": url, "kind": kind.label, "format": fmt, **got})
+                    continue
+                out.note = f"{out.note} Your browser couldn't download it either: {got.get('note')}"
             out_list.append({"url": url, "status": out.status or "failed", "format": fmt, "note": out.note})
             break  # a refusal applies to every format
         if out_list and (kind_name or out_list[0]["status"] != "not_found"):
             return out_list
         last = out_list
     return last
+
+
+def _link_via_browser(kind, gid: str, key: str, fmt: str, dest: Path, args) -> Dict[str, object]:
+    folder = browser.downloads_folder(args.browser, args.downloads)
+    url = google.as_account(google.export_url(kind, gid, fmt, key), args.account)
+    before = browser.snapshot(folder)
+    try:
+        browser.open_url(url, args.browser)
+    except browser.BrowserError as e:
+        return {"status": "failed", "note": str(e)}
+    got = browser.wait_for_download(folder, before, {"." + fmt}, timeout=60)
+    if got is None:
+        return {"status": "failed", "note": f"nothing arrived in {folder} within 60 s"}
+    check = validate.check_file(got, fmt)
+    if not check.ok:
+        return {"status": "failed", "note": f"{got.name} isn't a valid .{fmt} ({check.problem})"}
+    final = _free_name(dest, got.name, fmt)
+    import shutil
+
+    shutil.move(str(got), str(final))
+    return {"status": CONVERTED, "file": str(final), "facts": check.facts, "warnings": check.warnings, "via": "browser"}
 
 
 def _free_name(dest: Path, name: str, fmt: str) -> Path:

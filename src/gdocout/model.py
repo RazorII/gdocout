@@ -70,6 +70,7 @@ class Entry:
     mtime: float = 0.0
     gid: str = ""  # Google file ID
     key: str = ""  # resource key of an older link-shared file
+    account: str = ""  # the Google account the shortcut file belongs to (Drive for desktop records it)
     fmt: str = ""  # format exported to
     status: str = PENDING
     out_rel: str = ""  # path inside the destination, "/"-separated

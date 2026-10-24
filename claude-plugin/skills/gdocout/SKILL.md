@@ -1,11 +1,11 @@
 ---
 name: gdocout
-description: Turn Google Docs, Sheets and Slides into Word, Excel and PowerPoint files without signing in to Google, for files shared "anyone with the link". Works on one link at a time, or on a whole Google Drive saved offline (a Google Drive for desktop folder, where Google files are small .gdoc/.gsheet/.gslides shortcut files), copying everything else as it is and writing a filterable HTML report of every file. Use whenever the user wants Google Docs/Sheets/Slides as Office or PDF files, wants an offline or "leaving Google" copy of a Drive folder, has .gdoc/.gsheet/.gslides files that won't open, or asks which Google files in a folder can't be downloaded.
+description: Turn Google Docs, Sheets and Slides into Word, Excel and PowerPoint files without giving anything your Google password: files shared "anyone with the link" come straight from Google, the rest through the user's own signed-in web browser. Works on one link at a time, or on a whole Google Drive saved offline (a Google Drive for desktop folder, where Google files are small .gdoc/.gsheet/.gslides shortcut files), copying everything else as it is and writing a filterable HTML report of every file. Use whenever the user wants Google Docs/Sheets/Slides as Office or PDF files, wants an offline or "leaving Google" copy of a Drive folder, has .gdoc/.gsheet/.gslides files that won't open, or asks which Google files in a folder can't be downloaded.
 ---
 
 # gdocout: Google files you can open offline
 
-gdocout downloads Google Docs, Sheets and Slides in Office formats through the same links Google's own Download menu uses, so it needs **no Google account and no sign-in**. That only works for files shared "anyone with the link"; everything else is reported, never guessed at. Every download is checked before it counts, because Google answers errors with a web page that can look like a success.
+gdocout downloads Google Docs, Sheets and Slides in Office formats through the same links Google's own Download menu uses. Files shared "anyone with the link" need **no sign-in at all**. Files that aren't shared that way can come through the **user's own web browser**, when it's signed in to Google with an account that can open them; gdocout never sees a password or a cookie. Whatever can't be fetched either way is reported, never guessed at. Every download is checked before it counts, because Google answers errors with a web page that can look like a success.
 
 This skill needs **gdocout 0.1.0 or newer**. gdocout has no dependencies beyond Python 3.9+.
 
@@ -50,6 +50,12 @@ Before copying anything, ask the user, unless they already said:
    Run `gdocout scan SOURCE …` with the same choices to show the user what they'd get before copying. Files left out by a choice are reported as "left out by your choice" and keep their names, so a later run without the rule adds them.
 
 **The user would rather click than chat, or will run gdocout without Claude:** start `gdocout gui --source SOURCE --dest DEST` in the background (both optional). It opens a page in their web browser with every option above, folder pickers that know where Google Drive keeps its files, a live progress view, a Stop button and the equivalent command. It prints its address; give it to the user if no browser window appeared. The page runs on their computer only. Stop it afterwards (Quit in the page, or end the process).
+
+### 3a2. Get the files onto the computer, and the browser signed in
+
+**Files on the computer.** Google Drive for desktop's "stream files" mode keeps only placeholders for files nobody opened, and those can't be copied as they are. Before a big copy, tell the user to make the folders available offline in Google Drive: right-click the folder (or My Drive) › **Offline access** › **Available offline**, and wait for the green ticks; or switch Drive to **Mirror files** (Drive › Settings › Preferences › Folders from Drive › My Drive syncing options). Only the user can change that setting (there's no command for it), unless you can operate their screen and they agree. Google Docs, Sheets and Slides never become real files in Drive either way; gdocout downloads those. As a fallback, `--fetch-placeholders` makes gdocout ask Google Drive to download each placeholder itself while Drive is running and signed in (slower for a whole Drive; each file has a time limit, so a stuck Drive can't hang the copy).
+
+**Browser signed in (recommended).** Ask whether the user is signed in to Google in their web browser with the **same account Google Drive uses**. If so, add `--browser` (or `--browser chrome|safari|edge|firefox|brave|arc`): after the link-shared files, gdocout opens each file that Google refused in that browser, one at a time, using the account recorded in the Drive shortcut file, and moves the download from the browser's download folder into the copy. Tell the user: the browser may ask once to allow downloads from docs.google.com (allow it); a file the account can't open leaves an "Access Denied" tab, and gdocout stops after three such failures in a row; these downloads run at roughly ten a minute. Files the owner shared only with the account, or where the account is the owner, come through this way, including ones whose download is turned off for viewers when the account is the owner or an editor.
 
 ### 3b. Look before copying
 
@@ -99,6 +105,12 @@ After an owner changes sharing, `gdocout copy SOURCE --dest DEST --recheck` asks
 - **Placeholders** (`not_on_disk`): Google Drive's "stream files" mode keeps only a placeholder for files nobody opened. gdocout never opens them, because reading one makes Drive download it, which needs Drive running and signed in. The user can make the folder available offline in Google Drive first (right-click › Offline access › Available offline, or switch Drive to "Mirror files"), then run the copy again.
 - **A company or school Google account** may only allow links that work inside that organisation; those files come back `not_shared`, because gdocout never signs in.
 
+## 3f. Where this works
+
+- **Claude Code** (the Code tab of Claude Desktop, or `claude` in a terminal) on the user's computer: everything above.
+- **Without Claude**: the `gdocout` command and `gdocout gui` do all of it on their own.
+- **Claude Cowork**: the plugin installs there, but Cowork runs commands inside its own Linux virtual machine that sees only the folders the user attached, with filtered network access. The copy itself can work there if the user attaches both the Drive folder and the destination and Cowork's network setting allows docs.google.com and googleusercontent.com. What needs the computer itself doesn't: `gdocout gui` (the browser can't reach the virtual machine), `--browser` (the virtual machine can't open the user's browser), and spotting or fetching placeholders (macOS's placeholder marks aren't visible from Linux). So in Cowork, have the user make the Drive available offline first, and use Claude Code or `gdocout gui` for files that aren't shared by link. Cowork hasn't been tested.
+
 ## 4. How the files are checked
 
 If the user asks whether the converted files can be trusted: every download must be the right kind of file (Office files are ZIP archives whose every part passes its checksum, with the parts Word, Excel or PowerPoint needs, and well-formed XML); a web page or an empty answer is never kept. The report shows what was read from each file (words and pictures in a document, sheet names, slide count). Ordinary files are copied and their SHA-256 compared with the original. Nothing is half-written: files are written under a temporary name and renamed only once they pass.
@@ -109,7 +121,7 @@ If the user asks whether the converted files can be trusted: every download must
 
 ## Don't
 
-- Don't sign in to Google, use browser cookies, or ask the user for their Google password. gdocout works without them by design.
+- Don't sign in to Google yourself, read browser cookies, or ask for the user's Google password. Signed-in downloads go through the user's own browser (`--browser`), never through gdocout.
 - Don't choose the destination folder yourself.
 - Don't delete or change anything in the source folder.
 - Don't paste the whole file list into the conversation; point to the report.

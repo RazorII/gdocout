@@ -81,13 +81,13 @@ def walk(source: Path) -> Inventory:
         dirnames[:] = keep
         for name in sorted(filenames):
             rel = f"{rel_root}/{name}" if rel_root else name
-            inv.entries.append(_classify(rootp / name, rel, name))
+            inv.entries.append(classify(rootp / name, rel, name))
     for rel, why in errors:
         inv.entries.append(Entry(rel, "file", "", status=UNREADABLE, note=f"couldn't open this folder ({why})"))
     return inv
 
 
-def _classify(path: Path, rel: str, name: str) -> Entry:
+def classify(path: Path, rel: str, name: str) -> Entry:
     base, ext = split_ext(name)
     ext_l = ext.lower()
     e = Entry(rel, "file", ext_l)
@@ -125,7 +125,7 @@ def _classify(path: Path, rel: str, name: str) -> Entry:
     if kind_name is None and not data.lstrip().startswith(b"{"):
         return e  # an ordinary file that happens to have a .gXX extension (.gz, .gpx)
     try:
-        e.gid, e.key = google.parse_stub(data)
+        e.gid, e.key, e.account = google.parse_stub(data)
     except google.StubError as err:
         if kind_name is None:
             return e

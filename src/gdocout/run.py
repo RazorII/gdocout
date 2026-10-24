@@ -33,7 +33,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
-from . import __version__, fetch, google, inventory, report
+from . import __version__, browser, fetch, google, inventory, placeholders, report, validate
 from .inventory import REPORT_NAME, STATE_DIR
 from .model import (
     CONVERTED, COPIED, DONE, DOWNLOAD_OFF, EXPLAIN, FAILED, IGNORED, LABELS, NO_FORMAT, NOT_ON_DISK, NOT_SHARED,
@@ -69,6 +69,11 @@ class Options:
     start_workers: int = 2
     recheck: bool = False  # ask Google again about files that were refused before
     links: bool = True  # leave a small .html link page where a Google file couldn't be saved
+    fetch_placeholders: bool = False  # ask Google Drive to download files that are only placeholders
+    browser: Optional[str] = None  # "default", "chrome", …: download refused files through the user's signed-in browser
+    downloads: Optional[Path] = None  # where that browser saves downloads (found automatically when unset)
+    browser_timeout: float = 60.0  # seconds to wait for each browser download
+    opener: Optional[Callable[[str, bool], None]] = None  # opens a URL in the browser; tests replace it
     retries: int = 3
     retry_wait: float = 1.0  # scales the jittered wait before retrying a network error; tests use 0
     http: Optional[fetch.Http] = None
@@ -247,6 +252,8 @@ class _Run:
         try:
             self._copy_stage(entries)
             self._export_stage(entries)
+            if o.browser:
+                self._browser_stage(entries)
         except KeyboardInterrupt:
             self.pacer.stop("interrupted")
             self.stopped = "Stopped by hand. Everything finished so far is saved; run the same command again to continue."
@@ -288,6 +295,9 @@ class _Run:
                     e.link_rel = prev.link_rel
                 merged[rel] = e
                 continue
+            if e.status == NOT_ON_DISK and prev.status in DONE and (not e.size or prev.size == e.size):
+                merged[rel] = prev  # copied before, evicted to a placeholder since: the copy stands
+                continue
             if e.status != PENDING:  # now a placeholder, unreadable, ignored, no format
                 e.link_rel = prev.link_rel  # a link page left last time stays ours
                 merged[rel] = e
@@ -307,6 +317,8 @@ class _Run:
             if rel not in new and prev.status != IGNORED:
                 prev.status, prev.note = SOURCE_GONE, "It was in the folder during an earlier run, but isn't any more."
                 merged[rel] = prev
+        if self.o.fetch_placeholders:
+            self._fetch_placeholders(merged)
         taken = [e.out_rel for e in merged.values() if e.out_rel]
         taken += [x["o"] for e in merged.values() for x in e.extra.values()]
         inventory.allocate(merged.values(), inv.dirs, self.o.flat, self.o.formats, taken_before=taken)
@@ -519,6 +531,94 @@ class _Run:
                 self.state.commit()
             self.exported += handled
             self.export_seconds += time.monotonic() - t0
+
+    def _fetch_placeholders(self, merged: Dict[str, Entry]) -> None:
+        todo = [e for e in merged.values() if e.status == NOT_ON_DISK and not self.o.selection.why_left_out(e)]
+        if not todo:
+            return
+        self.o.say(f"Asking Google Drive to download {len(todo)} files that are only placeholders on this computer "
+                   f"({_size(sum(e.size for e in todo))}) …")
+        self._progress(stage="fetching placeholders", done=0, total=len(todo))
+        results = placeholders.fetch_all([(self.src / e.rel, e.size) for e in todo])
+        got = 0
+        for e, (ok, why) in zip(todo, results):
+            if ok:
+                fresh = inventory.classify(self.src / e.rel, e.rel, e.name)
+                fresh.link_rel = e.link_rel
+                merged[e.rel] = fresh
+                got += 1
+            else:
+                e.note = why
+        self.o.say(f"Google Drive delivered {got} of {len(todo)}.")
+
+    def _browser_stage(self, entries: Dict[str, Entry]) -> None:
+        todo = sorted((e for e in entries.values() if e.is_google and e.gid and e.status in (NOT_SHARED, DOWNLOAD_OFF)),
+                      key=lambda e: e.rel)
+        if not todo or self.cancel.is_set() or self.pacer.stopped:
+            return
+        folder = browser.downloads_folder(self.o.browser or "default", self.o.downloads)
+        who = "your web browser" if self.o.browser in (None, "", "default") else browser.BROWSERS.get(self.o.browser, (self.o.browser,))[0]
+        self.o.say(f"Trying {len(todo)} Google files that aren't shared by link through {who}, which should be signed in "
+                   f"to Google with an account that can open them. Downloads land in {folder} and are moved into the copy …")
+        opener = self.o.opener or (lambda url, bg: browser.open_url(url, self.o.browser or "default", bg))
+        got = streak = 0
+        for i, e in enumerate(todo, 1):
+            if self.cancel.is_set():
+                break
+            ok, why, check = self._via_browser(e, e.fmt, self.dst / e.out_rel, folder, opener, background=got > 0)
+            e.note = e.note.split(" Your browser couldn't")[0]
+            if ok:
+                got, streak = got + 1, 0
+                e.status, e.facts, e.warnings = CONVERTED, {**check.facts, "via": "browser"}, check.warnings
+                e.out_size = (self.dst / e.out_rel).stat().st_size
+                e.note = "Downloaded through your browser" + (f", signed in to Google as {e.account}." if e.account else ".")
+                for f, x in e.extra.items():
+                    ok2, why2, check2 = self._via_browser(e, f, self.dst / x["o"], folder, opener, background=True)
+                    size = (self.dst / x["o"]).stat().st_size if ok2 else None
+                    x.update(st=CONVERTED if ok2 else FAILED, n="" if ok2 else why2, s=size, f=check2.facts if ok2 else {})
+                self.counts["converted (browser)"] += 1
+            else:
+                streak += 1
+                e.note = f"{e.note} Your browser couldn't download it either: {why}"
+            self.state.save([e])
+            self.state.commit()
+            self._progress(stage="through the browser", done=i, total=len(todo))
+            if streak >= 3 and got == 0:
+                self.o.say(f"Stopped trying {who}: the first {streak} files didn't download. Sign in to Google there with "
+                           "the account Google Drive uses, allow downloads from docs.google.com if it asks, then run again.")
+                break
+            if streak >= 10:
+                self.o.say(f"Stopped trying {who} after {streak} files in a row didn't download.")
+                break
+        if got:
+            self.o.say(f"{got} of {len(todo)} came through the browser.")
+
+    def _via_browser(self, e: Entry, fmt: str, dest: Path, folder: Path, opener, background: bool):
+        kind = google.KINDS[e.kind]
+        url = google.as_account(google.export_url(kind, e.gid, fmt, e.key), e.account)
+        before = browser.snapshot(folder)
+        try:
+            opener(url, background)
+        except browser.BrowserError as err:
+            return False, str(err), None
+        got = browser.wait_for_download(folder, before, {"." + fmt}, timeout=self.o.browser_timeout)
+        if got is None:
+            return False, (f"nothing arrived in {folder} within {int(self.o.browser_timeout)} s; the browser may not be signed in "
+                           "with an account that can open it"), None
+        check = validate.check_file(got, fmt)
+        if not check.ok:
+            return False, f"{got.name} isn't a valid .{fmt} ({check.problem}); it was left in {folder}", None
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        part = dest.with_name(dest.name + fetch.PARTIAL)
+        shutil.move(str(got), str(part))
+        os.replace(part, dest)
+        fetch.unhide(dest)
+        if e.mtime:
+            try:
+                os.utime(dest, (e.mtime, e.mtime))
+            except OSError:
+                pass
+        return True, "", check
 
     def _sweep_partials(self) -> None:
         """Remove half-written files a crash left behind; finished files are never named like this."""

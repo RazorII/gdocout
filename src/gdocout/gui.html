@@ -43,7 +43,7 @@ a{color:var(--acc)}details summary{cursor:pointer;color:var(--mut)}pre.cmd{white
 <body>
 <div class="wrap">
   <h1>gdocout</h1>
-  <p class="lead">Copy a Google Drive folder into files you can open anywhere, offline: Google Docs, Sheets and Slides become Word, Excel and PowerPoint (or PDF), everything else is copied as it is. No Google sign-in; it works for files shared “anyone with the link”.</p>
+  <p class="lead">Copy a Google Drive folder into files you can open anywhere, offline: Google Docs, Sheets and Slides become Word, Excel and PowerPoint (or PDF), everything else is copied as it is. gdocout never asks for a Google password: files shared “anyone with the link” come straight from Google, and the rest through your own web browser, signed in to Google.</p>
 
   <div class="card">
     <h2><span class="step">1</span>The folder to copy</h2>
@@ -80,6 +80,12 @@ a{color:var(--acc)}details summary{cursor:pointer;color:var(--mut)}pre.cmd{white
       <details><summary class="small">By extension</summary><div class="types" id="exts"></div></details>
       <div class="row small"><span class="mut">Other:</span><input type="text" id="typesOther" placeholder="e.g. .heic, .mov, video"></div>
     </div>
+
+    <h3 style="font-size:15px;margin:16px 0 4px">Files Google won't hand out by link</h3>
+    <div class="opt"><input type="checkbox" id="useBrowser" checked><label for="useBrowser"><b>Use my web browser for them</b> <span class="mut">(recommended). Sign in to Google in that browser with the same account Google Drive uses; gdocout then downloads files that aren't shared by link the way you would, one at a time. The browser may ask once to allow downloads from docs.google.com.</span></label></div>
+    <div class="row small" id="browserRow"><span class="mut">Browser:</span><select id="browser"><option value="default">My default browser</option><option value="chrome">Google Chrome</option><option value="safari">Safari</option><option value="edge">Microsoft Edge</option><option value="firefox">Firefox</option><option value="brave">Brave</option><option value="arc">Arc</option></select>
+      <span class="mut">Its downloads folder:</span><input type="text" id="downloads" placeholder="found automatically" style="min-width:180px"></div>
+    <div class="opt"><input type="checkbox" id="fetchPh" checked><label for="fetchPh"><b>Ask Google Drive to download files that are only placeholders</b> <span class="mut">(Drive must be running and signed in). Faster for a whole Drive: in Drive, right-click the folder › Offline access › Available offline first.</span></label></div>
 
     <details style="margin-top:14px"><summary>Folders and names (other rules)</summary>
       <div class="small mut" style="margin:8px 0 4px">One rule per line. A rule ending in / is a folder and everything in it; * matches anything. Not case-sensitive.</div>
@@ -184,7 +190,8 @@ function form(){
     files_mode: document.querySelector("input[name=fmode]:checked").value,
     file_types: [...document.querySelectorAll("#typePick input[data-type]:checked")].map(c => c.dataset.type),
     file_types_other: $("typesOther").value, include:$("include").value, exclude:$("exclude").value,
-    max_workers: +$("maxw").value || 8, limit: +$("limit").value || null, links:$("links").checked, recheck:$("recheck").checked};
+    max_workers: +$("maxw").value || 8, limit: +$("limit").value || null, links:$("links").checked, recheck:$("recheck").checked,
+    use_browser:$("useBrowser").checked, browser:$("browser").value, downloads:$("downloads").value, fetch_placeholders:$("fetchPh").checked};
 }
 let cmdTimer;
 function changed(){ $("destShow").textContent = destPath() || "…"; clearTimeout(cmdTimer); cmdTimer = setTimeout(updateCmd, 200); }
@@ -192,7 +199,9 @@ async function updateCmd(){ $("err").textContent = "";
   if (!$("source").value.trim() || !destPath()){ $("cmd").textContent = "Choose the folder to copy and where the copy goes."; return; }
   try { $("cmd").textContent = (await api("/api/command", form())).command; } catch(e){ $("cmd").textContent = "…"; $("err").textContent = e.message; } }
 for (const id of ["source","destParent","destName","typesOther","include","exclude","maxw","limit"]) $(id).addEventListener("input", changed);
-for (const id of ["lay_tree","lay_flat","links","recheck"]) $(id).addEventListener("change", changed);
+for (const id of ["lay_tree","lay_flat","links","recheck","useBrowser","browser","fetchPh"]) $(id).addEventListener("change", changed);
+$("downloads").addEventListener("input", changed);
+$("useBrowser").addEventListener("change", () => $("browserRow").classList.toggle("hidden", !$("useBrowser").checked));
 $("copyCmd").onclick = () => navigator.clipboard.writeText($("cmd").textContent).then(() => { $("copyCmd").textContent = "Copied"; setTimeout(() => $("copyCmd").textContent = "Copy command", 1500); });
 
 // scanning
@@ -208,7 +217,7 @@ async function scan(first){
     const fx = $("scanFacts"); fx.textContent = ""; for (const [l, n, sub] of facts) fx.append(el("div",{class:"fact"}, el("b",null,String(n)), l, sub ? el("div",{class:"mut small"}, sub) : null));
     fx.classList.remove("hidden");
     const notes = $("scanNotes"); for (const [k, a] of Object.entries(s.attention)) notes.append(el("div",{class: k === "not_on_disk" ? "warn" : "mut"}, a.count + " " + a.label.toLowerCase() + ": " + a.examples.slice(0,3).join(", ") + (a.count > 3 ? " …" : "")));
-    if (s.attention.not_on_disk) notes.append(el("div",{class:"warn"}, "Some files are only placeholders on this computer. Make the folder available offline in Google Drive first, or they will be missing from the copy."));
+    if (s.attention.not_on_disk) notes.append(el("div",{class:"warn"}, s.attention.not_on_disk.count + " files are only placeholders on this computer. Best: in Google Drive, right-click the folder › Offline access › Available offline, wait for the green ticks, then check again. Or leave “Ask Google Drive to download…” ticked below."));
     changed();
   } catch(e){ box.textContent = ""; $("err").textContent = e.message; }
 }
@@ -243,7 +252,7 @@ $("start").onclick = async () => { $("err").textContent = "";
 $("stop").onclick = () => api("/api/stop", {}).then(() => { $("runTitle").textContent = "Stopping…"; });
 $("openReport").onclick = () => api("/api/open", {what:"report"});
 $("openDest").onclick = () => api("/api/open", {what:"dest"});
-const STAGES = {looking:"Looking through the folder", copying:"Copying files", downloading:"Downloading Google files", "extra formats":"Downloading extra formats", done:"Finished"};
+const STAGES = {looking:"Looking through the folder", "fetching placeholders":"Google Drive is downloading placeholders", copying:"Copying files", downloading:"Downloading Google files", "extra formats":"Downloading extra formats", "through the browser":"Downloading through your browser", done:"Finished"};
 async function status(){
   const s = await api("/api/status"); const L = s.live || {};
   $("log").textContent = s.log.join("\n"); $("log").scrollTop = 1e9;

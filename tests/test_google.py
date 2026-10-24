@@ -10,21 +10,21 @@ def stub_bytes(**kw):
 
 
 def test_stub_with_doc_id():
-    assert google.parse_stub(stub_bytes(doc_id="1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcd", resource_key="")) == (
-        "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcd", "")
+    assert google.parse_stub(stub_bytes(doc_id="1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcd", resource_key="", email="a@b.com")) == (
+        "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcd", "", "a@b.com")
 
 
 def test_stub_keeps_resource_key():
-    assert google.parse_stub(stub_bytes(doc_id="1abcdefghijk", resource_key="0-AbC_d")) == ("1abcdefghijk", "0-AbC_d")
+    assert google.parse_stub(stub_bytes(doc_id="1abcdefghijk", resource_key="0-AbC_d")) == ("1abcdefghijk", "0-AbC_d", "")
 
 
 def test_older_stub_with_url():
     data = stub_bytes(url="https://docs.google.com/document/d/1abcdefghijk/edit?usp=drivesdk&resourcekey=0-key", email="x")
-    assert google.parse_stub(data) == ("1abcdefghijk", "0-key")
+    assert google.parse_stub(data) == ("1abcdefghijk", "0-key", "")  # "x" isn't an email address, so no account
 
 
 def test_older_stub_with_resource_id():
-    assert google.parse_stub(stub_bytes(resource_id="document:1abcdefghijk")) == ("1abcdefghijk", "")
+    assert google.parse_stub(stub_bytes(resource_id="document:1abcdefghijk")) == ("1abcdefghijk", "", "")
 
 
 def test_stub_with_byte_order_mark():
@@ -70,3 +70,13 @@ def test_every_kind_with_exports_has_a_valid_default():
             assert kind.view
         else:
             assert kind.default is None and kind.why_none
+
+
+def test_account_is_kept_and_checked():
+    assert google.parse_stub(stub_bytes(doc_id="1abcdefghijk", email="owner@example.com"))[2] == "owner@example.com"
+    assert google.parse_stub(stub_bytes(doc_id="1abcdefghijk", email="x&authuser=evil"))[2] == ""
+
+
+def test_as_account_adds_authuser():
+    assert google.as_account("https://d/x/export?format=docx", "a@b.com") == "https://d/x/export?format=docx&authuser=a@b.com"
+    assert google.as_account("https://d/x/export/pptx", "") == "https://d/x/export/pptx"

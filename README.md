@@ -1,8 +1,8 @@
 # gdocout
 
-Turn Google Docs, Sheets and Slides into Word, Excel and PowerPoint files **without signing in to Google**. Give it one link, or a whole Google Drive saved offline, and it saves every file in a format you can open on any computer, offline, for good. Then it tells you which files it couldn't save, and why.
+Turn Google Docs, Sheets and Slides into Word, Excel and PowerPoint files **without giving anything your Google password**. Give it one link, or a whole Google Drive saved offline, and it saves every file in a format you can open on any computer, offline, for good. Then it tells you which files it couldn't save, and why.
 
-It works for files shared **"anyone with the link"**. Anything else is reported, never guessed at.
+Files shared **"anyone with the link"** come straight from Google, many at a time. The rest can come **through your own web browser**, signed in to Google with the account that can open them (`--browser`): gdocout opens each one there, like you clicking Download, and moves the download into the copy. Anything neither route can fetch is reported, never guessed at.
 
 ```
 gdocout copy ~/Google\ Drive/My\ Drive --dest ~/Drive-offline
@@ -58,6 +58,9 @@ Options for `copy` (and `scan`, to preview them):
 | `--no-copy` / `--no-convert` | only Google files, or only ordinary files, this run |
 | `--limit N` | download only N Google files this run: a sample, to check they're really shared by link |
 | `--recheck` | after an owner changed sharing, ask Google again about the refused files |
+| `--browser [NAME]` | for files that aren't shared by link: download them through your browser (default, `chrome`, `safari`, `edge`, `firefox`, `brave`, `arc`), signed in to Google as the account Google Drive uses. Recommended for your own Drive |
+| `--downloads DIR` | where that browser saves downloads, if gdocout guesses wrong |
+| `--fetch-placeholders` | ask Google Drive to download files that are only placeholders (Drive running and signed in) |
 | `--no-links` | don't leave link pages for files that couldn't be saved |
 | `--json` | print the summary as JSON |
 
@@ -68,13 +71,19 @@ Files left out by a choice are listed in the report as "left out by your choice"
 ## What it needs
 
 - **Python 3.9 or newer.** Nothing else to install, and no administrator rights.
-- **The files shared "anyone with the link"** (Viewer is enough), with downloading allowed. That's the owner's setting, not yours. A company or school account may only allow links that work inside the organisation; those files can't be fetched without signing in, and gdocout never signs in.
-- **The files really on the disk.** Google Drive for desktop's "stream files" mode keeps placeholders for files you haven't opened. gdocout reports them and doesn't open them. Make the folder available offline in Google Drive first (right-click › Offline access › Available offline, or switch Drive to "Mirror files").
+- **Either the files shared "anyone with the link"** (Viewer is enough, downloading allowed), **or your web browser signed in to Google** with an account that can open them, used with `--browser`. Recommended for your own Drive: sign in to the browser with the same account Google Drive uses. Your browser may ask once to allow downloads from docs.google.com. A company or school account may only allow links inside the organisation; the browser route still works for its members.
+- **The files really on the disk.** Google Drive for desktop's "stream files" mode keeps placeholders for files you haven't opened. Make the folders available offline in Google Drive first: right-click the folder › Offline access › Available offline, and wait for the green ticks, or switch Drive to "Mirror files" (Settings › Preferences › Folders from Drive). Only you can change that setting. `--fetch-placeholders` makes gdocout ask Drive for the stragglers itself. Google Docs, Sheets and Slides are never real files in Drive; gdocout downloads those either way.
 - **Permission to read the folder.** On macOS, the app you run gdocout from (Terminal, Claude…) needs access to Google Drive's folder, granted in System Settings › Privacy & Security › Files and Folders (or Full Disk Access). gdocout says so plainly when that's what's in the way.
 - **Room for the copy** and permission to write to the destination; `gdocout scan` tells you how much it will copy.
 - **Internet access to Google**: `docs.google.com`, `*.googleusercontent.com` (where the downloads come from) and `www.google.com` for My Maps.
 
-No Google account, password, API key or browser cookie is involved.
+gdocout never handles a Google password, API key or browser cookie.
+
+## Where it runs
+
+- **On its own**, from a terminal or `gdocout gui`, on macOS, Windows or Linux.
+- **Claude Code** with the plugin: everything.
+- **Claude Cowork**: the plugin installs, but Cowork runs commands in its own Linux virtual machine with only the folders you attach and filtered network access. The copy can work there (attach the Drive folder and the destination, and allow docs.google.com and googleusercontent.com in Cowork's network setting); the window, the browser route and placeholder handling need your computer itself and don't. Not tested.
 
 ## How fast, and Google's limits
 

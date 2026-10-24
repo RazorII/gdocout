@@ -7,6 +7,7 @@ Turns Google Docs, Sheets and Slides into Word, Excel and PowerPoint files witho
 - Python 3.9 or newer, to install the `gdocout` command. It has no other dependencies.
 - A place where Claude can run commands: Claude Code on macOS, Windows or Linux.
 - Internet access to Google.
+- For files that aren't shared "anyone with the link": your web browser signed in to Google with an account that can open them (recommended: the account Google Drive uses).
 
 ## What the plugin runs and downloads
 
@@ -22,6 +23,7 @@ Turns Google Docs, Sheets and Slides into Word, Excel and PowerPoint files witho
 - "My friend's whole Google Drive is in this folder. Make a copy I can open without Google." Claude asks where to put it, looks through the folder, tries a sample to check the files really are shared by link, copies everything, then summarises what needs the owner's attention and opens the report.
 - "Copy only the Google Docs and the PDFs, and give me a PDF of each Doc too." Claude sets the choices, shows what that would include, then copies.
 - "I'd rather pick the options myself." Claude opens gdocout's own window in your browser, with every option and a Start button. It works without Claude too.
+- "These are all my own files, and I'm signed in to Google in Safari." Claude adds the browser route, so files that aren't shared by link come through your own browser too.
 - "Which of these Google files can't be downloaded?" Claude runs a copy and lists them by reason.
 - "The owner re-shared some files. Try those again." Claude asks Google again about only the refused files.
 

@@ -25,6 +25,7 @@ from urllib.parse import parse_qs, urlparse
 
 ID_RE = re.compile(r"^[A-Za-z0-9_-]{10,200}$")
 KEY_RE = re.compile(r"^[A-Za-z0-9_-]{1,200}$")
+EMAIL_RE = re.compile(r"^[^@\s/?#&]{1,64}@[^@\s/?#&]{1,255}$")
 
 
 @dataclass(frozen=True)
@@ -115,8 +116,8 @@ class StubError(ValueError):
     pass
 
 
-def parse_stub(data: bytes) -> Tuple[str, str]:
-    """Return (file_id, resource_key) from a stub file's bytes, or raise StubError."""
+def parse_stub(data: bytes) -> Tuple[str, str, str]:
+    """Return (file_id, resource_key, account email) from a stub file's bytes, or raise StubError."""
     try:
         obj = json.loads(data.decode("utf-8-sig"))
     except (UnicodeDecodeError, ValueError) as e:
@@ -138,7 +139,10 @@ def parse_stub(data: bytes) -> Tuple[str, str]:
         raise StubError("the shortcut file holds an ID that isn't a Google file ID")
     if key and not KEY_RE.match(key):
         key = ""
-    return file_id, key
+    account = str(obj.get("email") or "").strip()
+    if not EMAIL_RE.match(account):
+        account = ""
+    return file_id, key, account
 
 
 def parse_link(url: str) -> Optional[Tuple[str, str, str]]:
@@ -196,6 +200,15 @@ def view_url(kind: Kind, file_id: str, key: str = "") -> Optional[str]:
 def open_url(file_id: str, key: str = "") -> str:
     """A link that opens any Google file, for the report."""
     return with_key("https://drive.google.com/open?id=" + file_id, key)
+
+
+def as_account(url: str, account: str) -> str:
+    """Ask Google to use one of the browser's signed-in accounts (the one Google Drive syncs)."""
+    if not account:
+        return url
+    from urllib.parse import quote
+
+    return url + ("&" if "?" in url else "?") + "authuser=" + quote(account, safe="@")
 
 
 def key_header(file_id: str, key: str) -> Dict[str, str]:
