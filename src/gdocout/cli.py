@@ -94,6 +94,7 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--no-browser", action="store_true", help="print the address instead of opening the browser")
     g.add_argument("--source", type=Path, help="open with this folder already chosen (and looked through)")
     g.add_argument("--dest", type=Path, help="open with this destination already chosen")
+    g.add_argument("--no-native-picker", action="store_true", help="choose folders inside the page instead of the system's folder dialog")
     return p
 
 
@@ -115,7 +116,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         if args.cmd == "gui":
             from . import gui
 
-            return gui.serve(port=args.port, open_browser=not args.no_browser, source=args.source, dest=args.dest)
+            return gui.serve(port=args.port, open_browser=not args.no_browser, source=args.source, dest=args.dest,
+                             native_picker=not args.no_native_picker)
     except (run.RunError, UsageError) as e:
         print(f"gdocout: {e}", file=sys.stderr)
         return run.EXIT_USAGE

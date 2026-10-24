@@ -18,6 +18,7 @@ import json
 import os
 import secrets
 import shlex
+import shutil
 import string
 import subprocess
 import sys
@@ -194,6 +195,63 @@ def list_dir(path_s: str, hidden: bool = False) -> Dict[str, object]:
         return {"path": str(path), "parent": str(path.parent), "dirs": [], "error": f"Can't open {path}: {e.strerror}"}
 
 
+def _applescript_str(s: str) -> str:
+    return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def _powershell_str(s: str) -> str:
+    return "'" + s.replace("'", "''") + "'"
+
+
+def native_picker_command(title: str, start: Optional[str] = None) -> Optional[List[str]]:
+    """The command that shows this computer's own folder dialog, or None when there isn't one."""
+    start = start if start and Path(start).expanduser().is_dir() else None
+    if sys.platform == "darwin":
+        where = f" default location (POSIX file {_applescript_str(str(Path(start).expanduser()))})" if start else ""
+        return ["osascript", "-e", "activate", "-e", f"POSIX path of (choose folder with prompt {_applescript_str(title)}{where})"]
+    if os.name == "nt":
+        ps = (
+            "Add-Type -AssemblyName System.Windows.Forms;"
+            "$owner = New-Object System.Windows.Forms.Form -Property @{TopMost=$true};"
+            "$d = New-Object System.Windows.Forms.FolderBrowserDialog;"
+            f"$d.Description = {_powershell_str(title)}; $d.ShowNewFolderButton = $true;"
+            + (f"$d.SelectedPath = {_powershell_str(start)};" if start else "")
+            + "[Console]::OutputEncoding = [Text.Encoding]::UTF8;"
+            "if ($d.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { $d.SelectedPath } else { exit 1 }"
+        )
+        return ["powershell", "-NoProfile", "-STA", "-Command", ps]
+    if shutil.which("zenity"):
+        return ["zenity", "--file-selection", "--directory", "--title", title] + (["--filename", start.rstrip("/") + "/"] if start else [])
+    if shutil.which("kdialog"):
+        return ["kdialog", "--getexistingdirectory", start or str(Path.home()), "--title", title]
+    return None
+
+
+_picking = threading.Lock()
+
+
+def pick_folder(title: str, start: Optional[str] = None, runner=subprocess.run) -> Dict[str, object]:
+    """Show the system's folder dialog and wait for the choice: {"path"}, {"cancelled"} or {"unsupported"}."""
+    cmd = native_picker_command(title, start)
+    if not cmd:
+        return {"unsupported": True}
+    if not _picking.acquire(blocking=False):
+        return {"busy": True}
+    try:
+        r = runner(cmd, capture_output=True, text=True, timeout=1800)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return {"unsupported": True, "error": str(e)[:200]}
+    finally:
+        _picking.release()
+    path = (r.stdout or "").strip()
+    if r.returncode == 0 and path:
+        return {"path": path.rstrip("/\\") or path}
+    err = (r.stderr or "").strip()
+    if "-128" in err or (r.returncode == 1 and not err):  # macOS "User canceled", or a dialog closed without a choice
+        return {"cancelled": True}
+    return {"unsupported": True, "error": err[:200]}
+
+
 def open_in_os(path: Path) -> None:
     if sys.platform == "darwin":
         subprocess.Popen(["open", str(path)])
@@ -272,7 +330,7 @@ def scan_form(form: Dict[str, object]) -> Dict[str, object]:
     return s
 
 
-def make_handler(token: str, port_ref: List[int], job: Job, stop: threading.Event):
+def make_handler(token: str, port_ref: List[int], job: Job, stop: threading.Event, native_picker: bool = True):
     page = resources.files("gdocout").joinpath("gui.html").read_text(encoding="utf-8")
 
     class Handler(BaseHTTPRequestHandler):
@@ -336,6 +394,10 @@ def make_handler(token: str, port_ref: List[int], job: Job, stop: threading.Even
                     return self._json({"command": command_line(argv)})
                 if route == "/api/scan":
                     return self._json(scan_form(form))
+                if route == "/api/pick":
+                    if not native_picker:
+                        return self._json({"unsupported": True})
+                    return self._json(pick_folder(str(form.get("title") or "Choose a folder"), form.get("start") or None))
                 if route == "/api/start":
                     return self._json(start_job(job, form))
                 if route == "/api/stop":
@@ -360,10 +422,11 @@ def make_handler(token: str, port_ref: List[int], job: Job, stop: threading.Even
     return Handler
 
 
-def serve(port: int = 0, open_browser: bool = True, source: Optional[Path] = None, dest: Optional[Path] = None) -> int:
+def serve(port: int = 0, open_browser: bool = True, source: Optional[Path] = None, dest: Optional[Path] = None,
+          native_picker: bool = True) -> int:
     token = secrets.token_urlsafe(18)
     job, stop, port_ref = Job(), threading.Event(), [0]
-    server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(token, port_ref, job, stop))
+    server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(token, port_ref, job, stop, native_picker))
     server.daemon_threads = True
     port_ref[0] = server.server_address[1]
     url = f"http://127.0.0.1:{port_ref[0]}/{token}/"

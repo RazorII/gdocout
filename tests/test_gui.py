@@ -134,3 +134,69 @@ def test_bad_choices_come_back_as_messages(server):
     port, token = server
     code, body = call(port, "POST", f"/{token}/api/start", {"source": "/nope", "dest": "/d"}, {"X-Gdocout-Token": token})
     assert code == 400 and "isn't a folder" in json.loads(body)["error"]
+
+
+def test_native_folder_dialog_per_system(monkeypatch, tmp_path):
+    monkeypatch.setattr(gui.sys, "platform", "darwin")
+    cmd = gui.native_picker_command('Pick "this"', str(tmp_path))
+    assert cmd[0] == "osascript" and 'choose folder with prompt "Pick \\"this\\""' in cmd[-1] and str(tmp_path) in cmd[-1]
+    monkeypatch.setattr(gui.sys, "platform", "linux")
+    monkeypatch.setattr(gui.os, "name", "nt")
+    cmd = gui.native_picker_command("It's mine")
+    assert cmd[:3] == ["powershell", "-NoProfile", "-STA"] and "'It''s mine'" in cmd[-1]
+    monkeypatch.setattr(gui.os, "name", "posix")
+    monkeypatch.setattr(gui.shutil, "which", lambda t: "/usr/bin/zenity" if t == "zenity" else None)
+    assert gui.native_picker_command("x")[:3] == ["zenity", "--file-selection", "--directory"]
+    monkeypatch.setattr(gui.shutil, "which", lambda t: None)
+    assert gui.native_picker_command("x") is None
+
+
+class Ran:
+    def __init__(self, code, out="", err=""):
+        self.returncode, self.stdout, self.stderr = code, out, err
+
+
+@pytest.mark.parametrize("ran,expected", [
+    (Ran(0, "/Users/someone/My Drive/\n"), {"path": "/Users/someone/My Drive"}),
+    (Ran(1, "", "execution error: User canceled. (-128)"), {"cancelled": True}),
+    (Ran(1, ""), {"cancelled": True}),
+    (Ran(2, "", "boom"), {"unsupported": True, "error": "boom"}),
+])
+def test_folder_dialog_answers(monkeypatch, ran, expected):
+    monkeypatch.setattr(gui, "native_picker_command", lambda title, start=None: ["fake"])
+    assert gui.pick_folder("t", runner=lambda *a, **k: ran) == expected
+
+
+def test_pick_can_be_turned_off(tmp_path):
+    token, port_ref, job, stop = "secret-token-1234567890", [0], gui.Job(), threading.Event()
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), gui.make_handler(token, port_ref, job, stop, native_picker=False))
+    port_ref[0] = srv.server_address[1]
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        code, body = call(port_ref[0], "POST", f"/{token}/api/pick", {"title": "x"}, {"X-Gdocout-Token": token})
+        assert code == 200 and json.loads(body) == {"unsupported": True}
+        code, page = call(port_ref[0], "GET", f"/{token}/")
+        assert b"<svg" in page and b"__GDOCOUT_ICON__" not in page and b"data:image/svg+xml," in page
+        assert b"isn't connected to gdocout" in page  # the message a page opened as a file shows
+    finally:
+        srv.shutdown()
+
+
+def test_pages_carry_the_same_icon_as_icon_svg():
+    """The icon is written into both pages, so it shows even when a page is opened as a plain file."""
+    from importlib import resources
+    from urllib.parse import quote
+    svg = resources.files("gdocout").joinpath("icon.svg").read_text(encoding="utf-8").strip()
+    uri = "data:image/svg+xml," + quote(svg, safe=":/= ")
+    for name in ("gui.html", "report_template.html"):
+        page = resources.files("gdocout").joinpath(name).read_text(encoding="utf-8")
+        assert svg in page and f'href="{uri}"' in page and "__GDOCOUT_" not in page.replace("__GDOCOUT_DATA__", "").replace("__GDOCOUT_VERSION__", ""), name
+
+
+def test_icon_is_in_the_report_and_survives_a_tricky_name(tmp_path):
+    from gdocout import report
+    from gdocout.model import Entry
+    out = report.write(tmp_path / "r.html", [Entry("__GDOCOUT_ICON__.txt", "file", ".txt", status="copied")], {})
+    html = out.read_text()
+    data = html.split('<script id="data" type="application/json">', 1)[1].split("</script>", 1)[0]
+    assert json.loads(data)["rows"][0]["p"] == "__GDOCOUT_ICON__.txt" and html.count("<svg") == 1
