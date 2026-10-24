@@ -25,6 +25,9 @@ def rows(entries: List[Entry]) -> List[Dict[str, object]]:
             row["o"] = e.out_rel
         if e.link_rel:
             row["l"] = e.link_rel
+        if e.extra:
+            row["x2"] = [{"fm": f, "o": x.get("o"), "st": x.get("st"), "n": x.get("n"), "os": x.get("s")}
+                         for f, x in e.extra.items()]
         if e.out_size is not None:
             row["os"] = e.out_size
         if e.renamed:

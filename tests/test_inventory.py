@@ -141,5 +141,5 @@ def test_folder_names_are_reserved_in_mirror_mode():
 
 def test_format_choice():
     entries = [E("Doc.gdoc", "document"), E("Sheet.gsheet", "spreadsheet")]
-    inventory.allocate(entries, [], flat=False, formats={"document": "pdf"})
+    inventory.allocate(entries, [], flat=False, formats={"document": ["pdf"]})
     assert [e.out_rel for e in entries] == ["Doc.pdf", "Sheet.xlsx"]

@@ -14,7 +14,7 @@ from typing import Dict, Iterable, Optional
 from .model import Entry
 
 COLUMNS = [f.name for f in fields(Entry)]
-JSON_COLUMNS = {"facts", "warnings"}
+JSON_COLUMNS = {"facts", "warnings", "extra"}
 
 
 class State:
@@ -40,7 +40,7 @@ class State:
         for row in self.db.execute(f"SELECT {', '.join(COLUMNS)} FROM files"):
             data = dict(zip(COLUMNS, row))
             for c in JSON_COLUMNS:
-                data[c] = json.loads(data[c]) if data[c] else ({} if c == "facts" else [])
+                data[c] = json.loads(data[c]) if data[c] else ([] if c == "warnings" else {})
             for c, conv in (("size", int), ("attempts", int), ("mtime", float), ("seconds", float)):
                 data[c] = conv(data[c] or 0)
             data["out_size"] = int(data["out_size"]) if data["out_size"] not in (None, "", "None") else None

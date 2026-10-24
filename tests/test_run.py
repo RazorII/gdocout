@@ -8,6 +8,7 @@ from conftest import stub
 
 from gdocout import fetch, run
 from gdocout.pacing import Pacer
+from gdocout.selection import Selection
 
 
 def fast_pacer(**kw):
@@ -114,7 +115,7 @@ def test_flat_layout(library, tmp_path, fake_google):
 
 def test_limit_takes_a_sample(library, tmp_path, fake_google):
     dest = tmp_path / "Copy"
-    res = run.copy_library(options(library, dest, fake_google, limit=2, google_only=True))
+    res = run.copy_library(options(library, dest, fake_google, limit=2, selection=Selection(copy=False)))
     s = res.summary
     assert s["this_run"].get("converted", 0) + s["this_run"].get("download_off", 0) + s["this_run"].get("not_shared", 0) \
         + s["this_run"].get("not_found", 0) == 2
@@ -208,3 +209,52 @@ def test_scan_writes_nothing(library, tmp_path):
     assert sorted(p for p in tmp_path.rglob("*")) == before
     assert s["to_export"] == 8 and s["to_copy"] == 2 and s["renamed"] == 1
     assert "pending" not in s["attention"] and s["attention"]["no_offline_format"]["count"] == 1
+
+
+def test_pdf_in_addition(library, tmp_path, fake_google):
+    pdf = b"%PDF-1.4\n1 0 obj<</Type /Page>>endobj\n%%EOF\n"
+    real = fake_google.answer
+
+    def answer(path):  # the fake answers PDF requests with a PDF
+        if "format=pdf" in path or path.split("?")[0].endswith("/pdf"):
+            code, ctype, body = real(path.replace("format=pdf", "format=docx").replace("/export/pdf", "/export/pptx"))
+            return (200, "application/pdf", pdf) if code == 200 else (code, ctype, body)
+        return real(path)
+
+    fake_google.answer = answer
+    dest = tmp_path / "Copy"
+    res = run.copy_library(options(library, dest, fake_google, formats={"document": ["docx", "pdf"], "spreadsheet": ["xlsx", "pdf"]}))
+    assert res.code == run.EXIT_OK
+    assert (dest / "Work/Plan.docx").exists() and (dest / "Work/Plan.pdf").read_bytes().startswith(b"%PDF")
+    assert (dest / "Work/Budget.pdf").exists() and not (dest / "Work/Deck.pdf").exists()
+    assert res.summary["extra_formats"] == {"converted": 3, "download_off": 1, "not_shared": 1, "not_found": 1}
+    # a refusal isn't asked twice: one export + one view request for Locked, none for its PDF
+    assert sum("dloff1aaaaaa" in h for h in fake_google.hits) == 2
+
+
+def test_pdf_added_on_a_later_run_downloads_only_the_pdfs(library, tmp_path, fake_google):
+    dest = tmp_path / "Copy"
+    run.copy_library(options(library, dest, fake_google))
+    before = len(fake_google.hits)
+    res = run.copy_library(options(library, dest, fake_google, formats={"document": ["docx", "pdf"]}))
+    asked = fake_google.hits[before:]
+    assert asked and all("format=pdf" in h for h in asked)
+    assert res.summary["counts"]["converted"] == 5
+
+
+def test_only_some_types(library, tmp_path, fake_google):
+    dest = tmp_path / "Copy"
+    res = run.copy_library(options(library, dest, fake_google, selection=Selection(only=["google-docs", "images"])))
+    c = res.summary["counts"]
+    assert (dest / "photo.jpg").exists() and (dest / "Work/Plan.docx").exists()
+    assert not (dest / "Work/Budget.xlsx").exists() and not (dest / "Old/Report.docx").exists()
+    assert c["skipped"] == 5  # Budget, Deck, Places, Survey and the real Report.docx
+    assert res.summary["finished"]
+
+
+def test_left_out_files_keep_their_names_for_later(library, tmp_path, fake_google):
+    dest = tmp_path / "Copy"
+    run.copy_library(options(library, dest, fake_google, selection=Selection(copy=False)))
+    assert (dest / "Old/Report (from Google Docs).docx").exists() and not (dest / "Old/Report.docx").exists()
+    run.copy_library(options(library, dest, fake_google))
+    assert (dest / "Old/Report.docx").read_bytes() == b"a real Word file"

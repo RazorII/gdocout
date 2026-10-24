@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gdocout</title>
+<style>
+:root{--bg:#f5f5f7;--card:#fff;--fg:#1d1d1f;--mut:#6e6e73;--line:#e3e3e8;--acc:#0e8a78;--acc2:#e6f4f1;--warn:#b26a00;--bad:#c62828;--ok:#1f8a4c}
+@media (prefers-color-scheme:dark){:root{--bg:#121214;--card:#1c1c1f;--fg:#ececf0;--mut:#9a9aa0;--line:#2e2e33;--acc:#3cc0a6;--acc2:#16302b;--warn:#e0a040;--bad:#ff6b6b;--ok:#4cc27e}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:900px;margin:0 auto;padding:22px 16px 60px}
+h1{font-size:22px;margin:0}.lead{color:var(--mut);margin:4px 0 18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:0 0 14px}
+.card h2{font-size:16px;margin:0 0 10px}.step{color:var(--acc);margin-right:6px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.row+.row{margin-top:8px}
+input[type=text],input[type=number],select,textarea{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 9px}
+input[type=text]{flex:1;min-width:200px}textarea{width:100%;min-height:62px;resize:vertical}
+button{font:inherit;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:8px;padding:7px 12px;cursor:pointer}
+button:hover{border-color:var(--acc)}button.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+.mut{color:var(--mut)}.small{font-size:13px}.err{color:var(--bad);margin-top:8px}.warn{color:var(--warn)}
+label{cursor:pointer}.opt{display:flex;gap:8px;align-items:flex-start;margin:6px 0}
+table.kinds{border-collapse:collapse;width:100%}table.kinds td{padding:6px 4px;border-bottom:1px solid var(--line);vertical-align:middle}
+.types{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.types label{border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:13px;display:inline-flex;gap:6px;align-items:center}
+.types label.on{background:var(--acc2);border-color:var(--acc)}
+a{color:var(--acc)}details summary{cursor:pointer;color:var(--mut)}pre.cmd{white-space:pre-wrap;word-break:break-all;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12.5px;margin:8px 0}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-top:10px}
+.fact{background:var(--bg);border-radius:8px;padding:8px 10px}.fact b{display:block;font-size:18px}
+.bar{height:10px;background:var(--bg);border-radius:6px;overflow:hidden;border:1px solid var(--line)}.bar>div{height:100%;background:var(--acc);width:0}
+.log{font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;background:var(--bg);border-radius:8px;padding:8px;max-height:180px;overflow:auto;white-space:pre-wrap;margin-top:10px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;padding:16px}
+.modal.open{display:flex}.dlg{background:var(--card);border-radius:12px;width:min(820px,100%);max-height:86vh;display:flex;flex-direction:column;border:1px solid var(--line)}
+.dlg header{padding:12px 14px;border-bottom:1px solid var(--line)}.dlg .body{display:grid;grid-template-columns:230px 1fr;min-height:0;flex:1}
+@media (max-width:640px){.dlg .body{grid-template-columns:1fr}.dlg .pl{max-height:120px}}
+.pl,.dl{overflow:auto;padding:8px}.pl{border-right:1px solid var(--line)}
+.pl div,.dl div{padding:6px 8px;border-radius:6px;cursor:pointer;word-break:break-word}.pl div:hover,.dl div:hover{background:var(--acc2)}
+.dlg footer{padding:10px 14px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.chip{border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:13px}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>gdocout</h1>
+  <p class="lead">Copy a Google Drive folder into files you can open anywhere, offline: Google Docs, Sheets and Slides become Word, Excel and PowerPoint (or PDF), everything else is copied as it is. No Google sign-in; it works for files shared “anyone with the link”.</p>
+
+  <div class="card">
+    <h2><span class="step">1</span>The folder to copy</h2>
+    <div class="row"><input type="text" id="source" placeholder="Choose a folder, e.g. Google Drive › My Drive"><button id="pickSource">Choose…</button></div>
+    <div id="scanBox" class="small mut" style="margin-top:8px">Choose a folder and gdocout will look through it first. Looking writes nothing.</div>
+    <div id="scanFacts" class="facts hidden"></div>
+    <div id="scanNotes" class="small" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">2</span>Where the copy goes</h2>
+    <div class="row"><input type="text" id="destParent" placeholder="A folder on this computer or a disk"><button id="pickDest">Choose…</button></div>
+    <div class="row"><span class="mut small">New folder for the copy:</span><input type="text" id="destName" placeholder="Drive copy"></div>
+    <div class="small mut" style="margin-top:6px">The copy goes to <b id="destShow">…</b>. It must be a new or empty folder, or one gdocout copied into before (to continue that copy).</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">3</span>What to include</h2>
+    <div class="opt"><input type="radio" name="layout" id="lay_tree" checked><label for="lay_tree"><b>Keep the folder structure</b> <span class="mut">(recommended): the copy has the same folders as the original</span></label></div>
+    <div class="opt"><input type="radio" name="layout" id="lay_flat"><label for="lay_flat"><b>Put every file in one folder</b> <span class="mut">(files with the same name get “(2)”, “(3)” added)</span></label></div>
+
+    <h3 style="font-size:15px;margin:16px 0 4px">Google files</h3>
+    <div class="row small"><span class="mut">Quick choice:</span><button data-preset="office">Office files</button><button data-preset="both">Office + PDF</button><button data-preset="pdf">PDF only</button></div>
+    <table class="kinds" id="kinds"></table>
+    <div id="formsNote" class="small mut"></div>
+
+    <h3 style="font-size:15px;margin:16px 0 4px">Other files (PDFs, photos, Word files, …)</h3>
+    <div class="opt"><input type="radio" name="fmode" id="fm_all" value="all" checked><label for="fm_all">Copy all of them</label></div>
+    <div class="opt"><input type="radio" name="fmode" id="fm_only" value="only"><label for="fm_only">Copy only the types I tick</label></div>
+    <div class="opt"><input type="radio" name="fmode" id="fm_except" value="except"><label for="fm_except">Copy all except the types I tick</label></div>
+    <div class="opt"><input type="radio" name="fmode" id="fm_none" value="none"><label for="fm_none">Don't copy them (Google files only)</label></div>
+    <div id="typePick" class="hidden">
+      <div class="types" id="cats"></div>
+      <details><summary class="small">By extension</summary><div class="types" id="exts"></div></details>
+      <div class="row small"><span class="mut">Other:</span><input type="text" id="typesOther" placeholder="e.g. .heic, .mov, video"></div>
+    </div>
+
+    <details style="margin-top:14px"><summary>Folders and names (other rules)</summary>
+      <div class="small mut" style="margin:8px 0 4px">One rule per line. A rule ending in / is a folder and everything in it; * matches anything. Not case-sensitive.</div>
+      <div class="row"><div style="flex:1;min-width:240px"><b class="small">Only these</b><textarea id="include" placeholder="Work/&#10;*budget*"></textarea></div>
+      <div style="flex:1;min-width:240px"><b class="small">Leave these out</b><textarea id="exclude" placeholder="Photos/&#10;*.tmp"></textarea></div></div>
+    </details>
+    <details style="margin-top:10px"><summary>More options</summary>
+      <div class="row small" style="margin-top:8px"><label>Most downloads at once <input type="number" id="maxw" min="1" max="16" value="8" style="width:64px"></label>
+        <span class="mut">gdocout starts with 2 and works up, slowing down by itself if Google asks.</span></div>
+      <div class="row small"><label>Try only <input type="number" id="limit" min="1" placeholder="all" style="width:80px"> Google files this time</label><span class="mut">(a sample, to check the files really are shared by link)</span></div>
+      <div class="opt small"><input type="checkbox" id="links" checked><label for="links">Leave a small link page where a Google file couldn't be saved</label></div>
+      <div class="opt small"><input type="checkbox" id="recheck"><label for="recheck">Ask Google again about files it refused last time (after an owner changed sharing)</label></div>
+    </details>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">4</span>Go</h2>
+    <div class="small mut">The same copy as a command, to run without this window or from a script:</div>
+    <pre class="cmd" id="cmd">…</pre>
+    <div class="row"><button id="copyCmd">Copy command</button><button id="rescan">Check with these choices</button><span style="flex:1"></span><button class="primary" id="start">Start copy</button></div>
+    <div id="err" class="err"></div>
+  </div>
+
+  <div class="card hidden" id="runCard">
+    <h2 id="runTitle">Copying…</h2>
+    <div class="bar"><div id="barFill"></div></div>
+    <div class="small mut" id="runLine" style="margin-top:6px"></div>
+    <div class="row" style="margin-top:10px"><button id="stop">Stop</button><button id="openReport" class="hidden primary">Open the report</button><button id="openDest" class="hidden">Show the copy</button></div>
+    <div id="result"></div>
+    <div class="log" id="log"></div>
+  </div>
+  <p class="small mut">gdocout __GDOCOUT_VERSION__ · runs on this computer only · <a href="#" id="quit">Quit</a></p>
+</div>
+
+<div class="modal" id="modal"><div class="dlg">
+  <header><b id="mTitle">Choose a folder</b><div class="row" style="margin-top:8px"><button id="mUp">↑ Up</button><input type="text" id="mPath"><button id="mGo">Go</button></div><div id="mErr" class="err small"></div></header>
+  <div class="body"><div class="pl" id="mPlaces"></div><div class="dl" id="mDirs"></div></div>
+  <footer><button id="mCancel">Cancel</button><button class="primary" id="mChoose">Choose this folder</button></footer>
+</div></div>
+
+<script>
+(function(){
+"use strict";
+const TOKEN = location.pathname.split("/")[1];
+const $ = id => document.getElementById(id);
+async function api(path, body){
+  const opts = body === undefined ? {} : {method:"POST", headers:{"Content-Type":"application/json","X-Gdocout-Token":TOKEN}, body:JSON.stringify(body)};
+  const r = await fetch("/" + TOKEN + path, opts); const j = await r.json().catch(() => ({error:"no answer"}));
+  if (!r.ok) throw new Error(j.error || ("error " + r.status)); return j; }
+function el(tag, attrs, ...kids){ const n = document.createElement(tag); for (const k in (attrs||{})){ if (k==="class") n.className=attrs[k]; else if (k.startsWith("on")) n[k]=attrs[k]; else n.setAttribute(k,attrs[k]); } for (const c of kids) if (c!=null) n.append(c.nodeType?c:String(c)); return n; }
+function size(n){ const u=["B","KB","MB","GB","TB"]; let i=0; while(n>=1024&&i<4){n/=1024;i++;} return (i?n.toFixed(1):n)+" "+u[i]; }
+const SEP = navigator.platform.startsWith("Win") ? "\\" : "/";
+
+// Google kinds and their format choices
+const KINDS = [
+  ["document","Google Docs",[["docx","Word (.docx)"],["pdf","PDF"],["docx,pdf","Word + PDF"],["odt","OpenDocument (.odt)"],["md","Markdown (.md)"],["epub","EPUB"],["txt","Plain text"]]],
+  ["spreadsheet","Google Sheets",[["xlsx","Excel (.xlsx)"],["pdf","PDF"],["xlsx,pdf","Excel + PDF"],["ods","OpenDocument (.ods)"]]],
+  ["presentation","Google Slides",[["pptx","PowerPoint (.pptx)"],["pdf","PDF"],["pptx,pdf","PowerPoint + PDF"],["odp","OpenDocument (.odp)"]]],
+  ["drawing","Google Drawings",[["pdf","PDF"],["png","PNG image"],["svg","SVG image"],["pdf,png","PDF + PNG"]]],
+  ["map","Google My Maps",[["kmz","KMZ (Google Earth)"],["kml","KML"]]],
+];
+const PRESETS = {office:{document:"docx",spreadsheet:"xlsx",presentation:"pptx",drawing:"pdf",map:"kmz"},
+  both:{document:"docx,pdf",spreadsheet:"xlsx,pdf",presentation:"pptx,pdf",drawing:"pdf",map:"kmz"},
+  pdf:{document:"pdf",spreadsheet:"pdf",presentation:"pdf",drawing:"pdf",map:"kmz"}};
+let census = null;
+function drawKinds(){
+  const t = $("kinds"); t.textContent = "";
+  for (const [k, label, fmts] of KINDS){
+    const n = census ? (census.google[k] || 0) : null;
+    if (census && !n) continue;
+    const cb = el("input",{type:"checkbox",id:"k_"+k}); cb.checked = true;
+    const sel = el("select",{id:"f_"+k}); for (const [v,l] of fmts) sel.append(el("option",{value:v},l)); sel.append(el("option",{value:"other"},"Other…"));
+    const other = el("input",{type:"text",id:"o_"+k,class:"hidden",placeholder:"formats, e.g. docx,pdf,epub",style:"min-width:160px"});
+    sel.onchange = () => { other.classList.toggle("hidden", sel.value !== "other"); changed(); };
+    cb.onchange = changed; other.oninput = changed;
+    t.append(el("tr",null, el("td",{style:"width:34px"},cb), el("td",null, el("label",{for:"k_"+k}, label), n!=null ? el("span",{class:"mut small"}," "+n) : null), el("td",null, sel, " ", other)));
+  }
+  const forms = census ? (census.google.form || 0) : 0, other = census ? Object.entries(census.google).filter(([k]) => !["document","spreadsheet","presentation","drawing","map","form"].includes(k)).reduce((a,[,v])=>a+v,0) : 0;
+  $("formsNote").textContent = (forms ? forms + " Google Forms" : "") + (forms && other ? " and " : "") + (other ? other + " other Google files" : "") + (forms || other ? ": Google offers no download for these, so the copy gets a link page in their place." : "");
+}
+document.querySelectorAll("[data-preset]").forEach(b => b.onclick = () => { const p = PRESETS[b.dataset.preset]; for (const k in p){ const s = $("f_"+k); if (s){ s.value = p[k]; $("o_"+k).classList.add("hidden"); } } changed(); });
+
+// ordinary file types, from what's actually in the folder
+const CAT_LABELS = {documents:"Documents",spreadsheets:"Spreadsheets",presentations:"Presentations",pdf:"PDFs",images:"Images",video:"Video",audio:"Audio",archives:"Archives",text:"Text & code",ebooks:"Ebooks",mapfiles:"Map files",other:"Other files"};
+function drawTypes(){
+  const cats = $("cats"), exts = $("exts"); cats.textContent = ""; exts.textContent = "";
+  const cc = census ? census.categories : Object.fromEntries(Object.keys(CAT_LABELS).map(k => [k, null]));
+  for (const k of Object.keys(CAT_LABELS)){ if (census && !cc[k]) continue; cats.append(typeChip(k, CAT_LABELS[k], cc[k])); }
+  if (census) for (const [x, n] of Object.entries(census.extensions)) if (x !== "(none)") exts.append(typeChip(x, x, n));
+}
+function typeChip(value, label, n){ const cb = el("input",{type:"checkbox","data-type":value}); const l = el("label",null, cb, label, n!=null ? el("span",{class:"mut"}, String(n)) : null);
+  cb.onchange = () => { l.classList.toggle("on", cb.checked); changed(); }; return l; }
+document.querySelectorAll("input[name=fmode]").forEach(r => r.onchange = () => { $("typePick").classList.toggle("hidden", !["only","except"].includes(r.value) || !r.checked); changed(); });
+
+// the form, as gdocout's options
+function destPath(){ const p = $("destParent").value.trim(), n = $("destName").value.trim(); if (!p) return ""; return n ? p.replace(/[\\/]+$/,"") + SEP + n : p; }
+function form(){
+  const google = {};
+  for (const [k] of KINDS){ const cb = $("k_"+k); if (!cb) continue; const sel = $("f_"+k);
+    google[k] = {include: cb.checked, formats: sel.value === "other" ? $("o_"+k).value.trim() : sel.value}; }
+  return {source:$("source").value.trim(), dest:destPath(), flat:$("lay_flat").checked, google,
+    files_mode: document.querySelector("input[name=fmode]:checked").value,
+    file_types: [...document.querySelectorAll("#typePick input[data-type]:checked")].map(c => c.dataset.type),
+    file_types_other: $("typesOther").value, include:$("include").value, exclude:$("exclude").value,
+    max_workers: +$("maxw").value || 8, limit: +$("limit").value || null, links:$("links").checked, recheck:$("recheck").checked};
+}
+let cmdTimer;
+function changed(){ $("destShow").textContent = destPath() || "…"; clearTimeout(cmdTimer); cmdTimer = setTimeout(updateCmd, 200); }
+async function updateCmd(){ $("err").textContent = "";
+  if (!$("source").value.trim() || !destPath()){ $("cmd").textContent = "Choose the folder to copy and where the copy goes."; return; }
+  try { $("cmd").textContent = (await api("/api/command", form())).command; } catch(e){ $("cmd").textContent = "…"; $("err").textContent = e.message; } }
+for (const id of ["source","destParent","destName","typesOther","include","exclude","maxw","limit"]) $(id).addEventListener("input", changed);
+for (const id of ["lay_tree","lay_flat","links","recheck"]) $(id).addEventListener("change", changed);
+$("copyCmd").onclick = () => navigator.clipboard.writeText($("cmd").textContent).then(() => { $("copyCmd").textContent = "Copied"; setTimeout(() => $("copyCmd").textContent = "Copy command", 1500); });
+
+// scanning
+async function scan(first){
+  const box = $("scanBox"); box.textContent = "Looking through the folder…"; $("scanFacts").classList.add("hidden"); $("scanNotes").textContent = "";
+  try {
+    const f = form(); if (first){ f.google = {}; f.files_mode = "all"; f.include = ""; f.exclude = ""; }
+    const s = await api("/api/scan", f);
+    if (first){ census = s.census; drawKinds(); drawTypes(); if (!$("destName").value) $("destName").value = s.source.split(/[\\/]/).filter(Boolean).pop() + " (offline copy)"; }
+    box.textContent = s.files + " files in " + s.folders + " folders. " + s.estimate_note;
+    const facts = [["Files to copy", s.to_copy, size(s.to_copy_bytes)], ["Google files to download", s.to_export, s.extra_downloads ? "+" + s.extra_downloads + " extra formats" : ""],
+      ["Left out by your choices", (s.by_status.skipped||0), ""], ["Set aside", Object.entries(s.attention).reduce((a,[,v]) => a + v.count, 0), "see below"]];
+    const fx = $("scanFacts"); fx.textContent = ""; for (const [l, n, sub] of facts) fx.append(el("div",{class:"fact"}, el("b",null,String(n)), l, sub ? el("div",{class:"mut small"}, sub) : null));
+    fx.classList.remove("hidden");
+    const notes = $("scanNotes"); for (const [k, a] of Object.entries(s.attention)) notes.append(el("div",{class: k === "not_on_disk" ? "warn" : "mut"}, a.count + " " + a.label.toLowerCase() + ": " + a.examples.slice(0,3).join(", ") + (a.count > 3 ? " …" : "")));
+    if (s.attention.not_on_disk) notes.append(el("div",{class:"warn"}, "Some files are only placeholders on this computer. Make the folder available offline in Google Drive first, or they will be missing from the copy."));
+    changed();
+  } catch(e){ box.textContent = ""; $("err").textContent = e.message; }
+}
+$("rescan").onclick = () => scan(false);
+
+// folder browser
+let pickTarget = null;
+async function openPicker(target, title){ pickTarget = target; $("mTitle").textContent = title; $("modal").classList.add("open");
+  const pl = $("mPlaces"); pl.textContent = "";
+  try { for (const p of (await api("/api/places")).places) pl.append(el("div",{title:p.path, onclick:() => browse(p.path)}, p.label)); } catch(e){}
+  browse($(target).value.trim() || ""); }
+async function browse(path){ $("mErr").textContent = "";
+  const r = await api("/api/list?path=" + encodeURIComponent(path)); $("mPath").value = r.path; $("mUp").dataset.parent = r.parent || "";
+  if (r.error) $("mErr").textContent = r.error;
+  const dl = $("mDirs"); dl.textContent = ""; for (const d of r.dirs) dl.append(el("div",{onclick:() => browse(r.path.replace(/[\\/]+$/,"") + SEP + d)}, "📁 " + d));
+  if (!r.dirs.length && !r.error) dl.append(el("div",{class:"mut"},"No folders inside.")); }
+$("mUp").onclick = () => { if ($("mUp").dataset.parent) browse($("mUp").dataset.parent); };
+$("mGo").onclick = () => browse($("mPath").value);
+$("mCancel").onclick = () => $("modal").classList.remove("open");
+$("mChoose").onclick = () => { $(pickTarget).value = $("mPath").value; $("modal").classList.remove("open"); if (pickTarget === "source") scan(true); changed(); };
+$("pickSource").onclick = () => openPicker("source", "Choose the folder to copy");
+$("pickDest").onclick = () => openPicker("destParent", "Choose where the copy goes");
+$("source").addEventListener("change", () => scan(true));
+
+// running
+let poll;
+$("start").onclick = async () => { $("err").textContent = "";
+  try { const r = await api("/api/start", form()); $("runCard").classList.remove("hidden"); $("result").textContent = ""; $("start").disabled = true;
+    $("openReport").classList.add("hidden"); $("openDest").classList.add("hidden"); $("stop").classList.remove("hidden"); $("runTitle").textContent = "Copying…";
+    $("runCard").scrollIntoView({behavior:"smooth"}); poll = setInterval(status, 1000); }
+  catch(e){ $("err").textContent = e.message; } };
+$("stop").onclick = () => api("/api/stop", {}).then(() => { $("runTitle").textContent = "Stopping…"; });
+$("openReport").onclick = () => api("/api/open", {what:"report"});
+$("openDest").onclick = () => api("/api/open", {what:"dest"});
+const STAGES = {looking:"Looking through the folder", copying:"Copying files", downloading:"Downloading Google files", "extra formats":"Downloading extra formats", done:"Finished"};
+async function status(){
+  const s = await api("/api/status"); const L = s.live || {};
+  $("log").textContent = s.log.join("\n"); $("log").scrollTop = 1e9;
+  const pct = L.total ? Math.round(100 * L.done / L.total) : 0; $("barFill").style.width = pct + "%";
+  $("runLine").textContent = (STAGES[L.stage] || L.stage || "") + (L.total ? ": " + L.done + " of " + L.total : "") + (L.rate ? " · " + L.rate + " a minute" : "")
+    + (L.workers ? " · " + L.workers + " at once" : "") + (L.paused ? " · paused: Google asked to slow down, it continues by itself" : "");
+  if (!s.running && (s.summary || s.error)){ clearInterval(poll); $("start").disabled = false; $("stop").classList.add("hidden");
+    if (s.error){ $("runTitle").textContent = "Couldn't copy"; $("result").append(el("div",{class:"err"}, s.error)); return; }
+    const S = s.summary; $("runTitle").textContent = S.finished ? "Done" : "Stopped"; $("barFill").style.width = "100%";
+    const T = S.this_run || {}; $("runLine").textContent = (S.finished ? "Finished" : "Stopped") + " in " + Math.round(T.seconds || 0) + " s · " + S.files + " files looked at"
+      + (T.downloads_per_minute ? " · " + T.downloads_per_minute + " downloads a minute" : "") + (T.pauses ? " · paused " + T.pauses + "× when Google asked" : "") + " · " + s.command;
+    const r = $("result"); r.textContent = ""; if (S.stopped) r.append(el("p",{class:"warn"}, S.stopped));
+    const chips = el("div",{class:"chips"}); for (const [k, n] of Object.entries(S.counts)) chips.append(el("span",{class:"chip"}, (S.labels[k]||k) + ": " + n)); r.append(chips);
+    for (const [k, a] of Object.entries(S.attention)) r.append(el("div",{class:"small",style:"margin-top:6px"}, el("b",null, a.label + " (" + a.count + "): "), a.examples.slice(0,5).join(", ") + (a.count > 5 ? " …" : "")));
+    $("openReport").classList.remove("hidden"); $("openDest").classList.remove("hidden"); }
+}
+$("quit").onclick = e => { e.preventDefault(); api("/api/quit", {}).then(() => { document.body.innerHTML = "<p style='padding:30px;font:16px sans-serif'>gdocout is closed. You can close this tab.</p>"; }); };
+drawKinds(); drawTypes(); changed();
+const pre = new URLSearchParams(location.hash.slice(1));
+if (pre.get("dest")){ const d = pre.get("dest").replace(/[\\/]+$/, ""); const i = Math.max(d.lastIndexOf("/"), d.lastIndexOf("\\"));
+  $("destParent").value = d.slice(0, i) || d; $("destName").value = d.slice(i + 1); }
+if (pre.get("source")){ $("source").value = pre.get("source"); scan(true); }
+api("/api/status").then(s => { if (s.running || s.summary || s.error){ $("runCard").classList.remove("hidden"); if (s.running){ $("start").disabled = true; poll = setInterval(status, 1000); } else status(); } });
+})();
+</script>
+</body>
+</html>

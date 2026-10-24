@@ -17,6 +17,7 @@ UNREADABLE = "unreadable"
 IGNORED = "ignored"
 FAILED = "failed"
 SOURCE_GONE = "source_gone"
+SKIPPED = "skipped"
 
 # Order is the order the report and summaries list them in.
 LABELS: Dict[str, str] = {
@@ -31,6 +32,7 @@ LABELS: Dict[str, str] = {
     FAILED: "Failed",
     PENDING: "Not done yet",
     SOURCE_GONE: "Gone from the source",
+    SKIPPED: "Left out by your choice",
     IGNORED: "System file, skipped",
 }
 
@@ -48,6 +50,7 @@ EXPLAIN: Dict[str, str] = {
     FAILED: "Something went wrong; the details say what. Running gdocout again retries it.",
     PENDING: "The run stopped before this file's turn. Running gdocout again continues.",
     SOURCE_GONE: "It was in the folder during an earlier run, but isn't any more.",
+    SKIPPED: "A rule chosen for this copy left it out: a type, folder or name rule, or a list of files.",
     IGNORED: "A file the operating system or a sync app keeps for itself; not part of the library.",
 }
 
@@ -70,6 +73,7 @@ class Entry:
     fmt: str = ""  # format exported to
     status: str = PENDING
     out_rel: str = ""  # path inside the destination, "/"-separated
+    extra: Dict[str, Dict[str, object]] = field(default_factory=dict)  # more formats of a Google file: fmt -> {o, st, s, n, f}
     link_rel: str = ""  # a small .html page pointing at the Google file, when it couldn't be saved
     renamed: bool = False
     note: str = ""  # why, in plain words

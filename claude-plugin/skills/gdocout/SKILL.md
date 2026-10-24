@@ -38,10 +38,18 @@ Docs become .docx, Sheets .xlsx, Slides .pptx unless `--format` says otherwise (
 
 ### 3a. Ask first, every time
 
-Before copying anything, ask the user two things, unless they already said:
+Before copying anything, ask the user, unless they already said:
 
 1. **Where the copy should go.** Always ask; never pick a folder yourself. It must be an empty folder (gdocout creates it if it doesn't exist) or a folder gdocout copied into before, to continue that copy. It can't be inside the folder being copied.
-2. **Keep the folder structure (the default), or put every file in one folder** (`--flat`). With `--flat`, files with the same name are numbered, " (2)", " (3)".
+2. **Keep the folder structure, or put every file in one folder.** Keeping it is the default and stays the default unless the user asks for one folder (`--flat`). With `--flat`, files with the same name are numbered, " (2)", " (3)".
+3. **What to include, only if the user hasn't said "everything".** The default is a full copy: every ordinary file copied as it is, every Google file converted. Offer these as multiple-choice questions where your tools allow it (the user can always type their own answer):
+   - Google files as **Office files** (the default), **Office + PDF** (`--pdf also`), **PDF only** (`--pdf only`), or other formats (`--format document=odt,pdf`; Docs also `md`, `epub`, `txt`, `rtf`; Sheets `ods`; Slides `odp`; Drawings `png`, `svg`; My Maps `kml`).
+   - Other files: **all** (default), **only some types** (`--only`), **all except some types** (`--skip`), or **none** (`--no-copy`). Types are categories (`documents`, `spreadsheets`, `presentations`, `pdf`, `images`, `video`, `audio`, `archives`, `text`, `ebooks`, `mapfiles`, `other`), Google types (`google-docs`, `google-sheets`, `google-slides`, `google-drawings`, `google-maps`, `google-forms`, `google`), or extensions (`.heic`). A category includes the matching Google files: `--only documents` takes Word files and Google Docs; `--only google-docs` takes only Google Docs. With `--only`, name the Google types the user still wants too.
+   - Folders and names: `--include 'Work/'`, `--exclude 'Photos/'`, `--exclude '*.tmp'` (a trailing `/` means a folder and everything in it; `*` matches anything; not case-sensitive). For a hand-picked set of files, write their paths (relative to the source, one per line) to a file and pass `--files-from FILE`.
+
+   Run `gdocout scan SOURCE …` with the same choices to show the user what they'd get before copying. Files left out by a choice are reported as "left out by your choice" and keep their names, so a later run without the rule adds them.
+
+**The user would rather click than chat, or will run gdocout without Claude:** start `gdocout gui --source SOURCE --dest DEST` in the background (both optional). It opens a page in their web browser with every option above, folder pickers that know where Google Drive keeps its files, a live progress view, a Stop button and the equivalent command. It prints its address; give it to the user if no browser window appeared. The page runs on their computer only. Stop it afterwards (Quit in the page, or end the process).
 
 ### 3b. Look before copying
 
@@ -67,13 +75,13 @@ gdocout copy SOURCE --dest DEST --json
 
 gdocout paces itself. It starts with 2 downloads at once and works up to 8 (about 140 files a minute overall, measured), halves and pauses when Google pushes back, and stops after about half an hour of refusals. It prints progress to stderr. A copy of more than a few hundred Google files takes minutes to an hour, so run it in the background where you can, check on it, and tell the user when it finishes. Never run two copies into the same destination at once.
 
-Exit codes: 0 finished; 1 finished, but some files failed (they are retried on the next run); 2 a problem with the request (paths, a destination in use for another folder); 5 Google kept refusing downloads from this connection, so the copy stopped with everything so far saved (run the same command later, an hour or more, to continue); 130 stopped by hand (same command continues).
+Exit codes: 0 finished; 1 finished, but some files failed (they are retried on the next run); 2 a problem with the request (paths, permissions, a destination in use for another folder, an unknown type or format); 5 Google kept refusing downloads from this connection, so the copy stopped with everything so far saved (run the same command later, an hour or more, to continue); 130 stopped by hand (same command continues).
 
 ### 3d. Tell the user what happened
 
 Summarise from the JSON. **Never list every file.** The report is the place for that.
 
-- One line of totals: converted, copied, and the total written.
+- One line of totals: converted, copied, extra formats (`extra_formats`), left out by choice, and the total written.
 - Then each group in `attention`, with its count and up to five example paths:
   - `download_off`: anyone with the link can view it, but its owner turned off downloading. Only the owner can change that. Say so plainly, and don't try to work around it (no screenshots, printing or copying text from the viewer).
   - `not_shared`: not shared with "anyone with the link". The owner has to share it that way.
@@ -84,6 +92,12 @@ Summarise from the JSON. **Never list every file.** The report is the place for 
 - The report: `report` is a self-contained HTML page in the destination. It lists every file with a folder tree, status, type and extension filters, search, a CSV download of the filtered list, and a "Copy Google links" button that gives the owner a list of what to re-share. Offer to open it.
 
 After an owner changes sharing, `gdocout copy SOURCE --dest DEST --recheck` asks Google again about the refused files only.
+
+### 3e. When the computer says no
+
+- **"macOS isn't letting this app read …"** (exit 2): the app running gdocout needs permission to read that folder. On macOS that's System Settings → Privacy & Security → Files and Folders (for Google Drive's folder, Desktop, Documents, Downloads or a removable disk), or Full Disk Access, for the app that runs the command (Terminal, Claude, …). Tell the user exactly that; they have to switch it on themselves, then quit and reopen the app.
+- **Placeholders** (`not_on_disk`): Google Drive's "stream files" mode keeps only a placeholder for files nobody opened. gdocout never opens them, because reading one makes Drive download it, which needs Drive running and signed in. The user can make the folder available offline in Google Drive first (right-click › Offline access › Available offline, or switch Drive to "Mirror files"), then run the copy again.
+- **A company or school Google account** may only allow links that work inside that organisation; those files come back `not_shared`, because gdocout never signs in.
 
 ## 4. How the files are checked
 

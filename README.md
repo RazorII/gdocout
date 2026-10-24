@@ -13,7 +13,7 @@ gdocout copy ~/Google\ Drive/My\ Drive --dest ~/Drive-offline
 On a computer with Google Drive for desktop, a Google Doc isn't really on the disk. It's a 172-byte shortcut file (`.gdoc`, `.gsheet`, `.gslides`) that only holds the file's ID. Copy the folder somewhere else and you've copied the shortcuts, not the documents. gdocout copies the real thing:
 
 - **Ordinary files** (PDFs, photos, Word files…) are copied as they are, and each copy's SHA-256 is checked against the original.
-- **Google files** are downloaded from Google in an offline format: Docs → .docx, Sheets → .xlsx (every tab), Slides → .pptx, Drawings → .pdf, My Maps → .kmz. You can choose others (`--format document=pdf`, `md`, `odt`…).
+- **Google files** are downloaded from Google in an offline format: Docs → .docx, Sheets → .xlsx (every tab), Slides → .pptx, Drawings → .pdf, My Maps → .kmz. Add a PDF of each (`--pdf also`), save only PDFs (`--pdf only`), or choose others (`--format document=odt,pdf`, `md`, `epub`…).
 - **Files it can't save** get a small `.html` link page in their place, saying why, so the copy still shows where they were:
   - **Download turned off**: anyone with the link can view it, but its owner turned off downloading.
   - **Not shared by link**: the file is private or shared only with certain people.
@@ -36,24 +36,45 @@ There's also a [Claude plugin](claude-plugin/README.md) that runs all of this fo
 ## Use
 
 ```
+gdocout gui                              # a window in your browser with every option
 gdocout scan  FOLDER                     # what a copy would do; offline, writes nothing
 gdocout copy  FOLDER --dest NEW_FOLDER   # copy and convert; run it again to continue
 gdocout link  URL [URL…] --dest FOLDER   # just these Google links
 gdocout report NEW_FOLDER                # rebuild the HTML report
 ```
 
-Useful options for `copy`:
+`gdocout gui` opens a page in your web browser, served by gdocout on your own computer: folder pickers that know where Google Drive keeps its files, every option below as a choice with room for your own, a live progress view, and the equivalent command, so whatever you set up there can also be run from a script. `--source` and `--dest` open it with those folders already chosen.
+
+Options for `copy` (and `scan`, to preview them):
 
 | Option | What it does |
 |---|---|
-| `--flat` | every file in one folder instead of the original structure |
-| `--format KIND=FMT` | e.g. `document=pdf`, `spreadsheet=ods`, `presentation=pdf`, `document=md` |
-| `--limit N --google-only` | try N Google files first, to check they're really shared by link |
+| `--flat` | every file in one folder instead of the original structure (the default keeps it) |
+| `--pdf also` / `--pdf only` | a PDF of every Google Doc, Sheet, Slides file and Drawing as well, or instead |
+| `--format KIND=FMT[,FMT]` | e.g. `document=docx,pdf`, `spreadsheet=ods`, `presentation=pdf`, `document=md` |
+| `--only TYPES` / `--skip TYPES` | e.g. `--only pdf,images,google-docs` or `--skip video,.heic` (types below) |
+| `--include PATTERN` / `--exclude PATTERN` | folders or names, e.g. `--include 'Work/'`, `--exclude 'Photos/'`, `--exclude '*.tmp'` |
+| `--files-from LIST` | only the paths in a text file, one per line (a folder takes everything in it) |
+| `--no-copy` / `--no-convert` | only Google files, or only ordinary files, this run |
+| `--limit N` | download only N Google files this run: a sample, to check they're really shared by link |
 | `--recheck` | after an owner changed sharing, ask Google again about the refused files |
 | `--no-links` | don't leave link pages for files that couldn't be saved |
 | `--json` | print the summary as JSON |
 
-The destination must be empty, or a folder gdocout copied into before (to continue that copy).
+Types are categories (`documents`, `spreadsheets`, `presentations`, `pdf`, `images`, `video`, `audio`, `archives`, `text`, `ebooks`, `mapfiles`, `other`), Google types (`google`, `google-docs`, `google-sheets`, `google-slides`, `google-drawings`, `google-maps`, `google-forms`) or extensions (`.heic`). A category includes the matching Google files: `documents` means Word files and Google Docs.
+
+Files left out by a choice are listed in the report as "left out by your choice", and they keep their names: run again without the rule, into the same folder, and they're added. The destination must be empty, or a folder gdocout copied into before (to continue that copy).
+
+## What it needs
+
+- **Python 3.9 or newer.** Nothing else to install, and no administrator rights.
+- **The files shared "anyone with the link"** (Viewer is enough), with downloading allowed. That's the owner's setting, not yours. A company or school account may only allow links that work inside the organisation; those files can't be fetched without signing in, and gdocout never signs in.
+- **The files really on the disk.** Google Drive for desktop's "stream files" mode keeps placeholders for files you haven't opened. gdocout reports them and doesn't open them. Make the folder available offline in Google Drive first (right-click › Offline access › Available offline, or switch Drive to "Mirror files").
+- **Permission to read the folder.** On macOS, the app you run gdocout from (Terminal, Claude…) needs access to Google Drive's folder, granted in System Settings › Privacy & Security › Files and Folders (or Full Disk Access). gdocout says so plainly when that's what's in the way.
+- **Room for the copy** and permission to write to the destination; `gdocout scan` tells you how much it will copy.
+- **Internet access to Google**: `docs.google.com`, `*.googleusercontent.com` (where the downloads come from) and `www.google.com` for My Maps.
+
+No Google account, password, API key or browser cookie is involved.
 
 ## How fast, and Google's limits
 

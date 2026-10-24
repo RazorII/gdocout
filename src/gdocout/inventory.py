@@ -13,10 +13,10 @@ import stat
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Set, Tuple
+from typing import Dict, Iterable, List, Set, Tuple
 
 from . import google
-from .model import IGNORED, NO_FORMAT, NOT_ON_DISK, PENDING, UNREADABLE, Entry
+from .model import CONVERTED, IGNORED, NO_FORMAT, NOT_ON_DISK, PENDING, UNREADABLE, Entry
 
 SF_DATALESS = 0x40000000  # macOS: contents live in the cloud only
 WIN_PLACEHOLDER = 0x400000 | 0x40000 | 0x1000  # RECALL_ON_DATA_ACCESS | RECALL_ON_OPEN | OFFLINE
@@ -147,26 +147,47 @@ def google_base(e: Entry) -> str:
     return base if inner.lower() in kind.family else stub_base
 
 
-def pick_format(kind: google.Kind, wanted: Dict[str, str]) -> Optional[str]:
-    fmt = wanted.get(kind.name) or kind.default
-    return fmt if fmt in kind.exports else kind.default
+def wanted_formats(kind: google.Kind, formats: Dict[str, List[str]]) -> List[str]:
+    """The formats to save a kind in, main one first: what was asked for, or the default."""
+    out: List[str] = []
+    for f in formats.get(kind.name) or []:
+        if f in kind.exports and f not in out:
+            out.append(f)
+    return out or ([kind.default] if kind.default else [])
+
+
+def apply_pdf(formats: Dict[str, List[str]], mode: str) -> Dict[str, List[str]]:
+    """--pdf also / only: add a PDF of every Google Doc, Sheet, Slides file and Drawing, or save only PDFs."""
+    out = {k: list(v) for k, v in formats.items()}
+    if mode not in ("also", "only"):
+        return out
+    for name in ("document", "spreadsheet", "presentation", "drawing"):
+        kind = google.KINDS[name]
+        if mode == "only":
+            out[name] = ["pdf"]
+        else:
+            current = wanted_formats(kind, out)
+            out[name] = current + ([] if "pdf" in current else ["pdf"])
+    return out
 
 
 def allocate(
     entries: Iterable[Entry],
     dirs: Iterable[str],
     flat: bool,
-    formats: Dict[str, str],
+    formats: Dict[str, List[str]],
     taken_before: Iterable[str] = (),
 ) -> None:
-    """Give every entry that will produce a file a destination path.
+    """Give every file a copy will produce a destination path.
 
-    Deterministic, so a resumed run gets the same names. Paths already handed out
-    in an earlier run (taken_before) keep their owners. Ordinary files claim
-    their names first; a converted file that collides gets "(from Google Docs)"
-    added, and anything still colliding gets " (2)", " (3)"...
+    Deterministic, so a resumed run gets the same names. Paths handed out in an
+    earlier run (taken_before) keep their owners. Ordinary files claim their names
+    first, then each Google file's main format, then any extra formats; a Google
+    file's copy that collides gets "(from Google Docs)" added, and anything still
+    colliding gets " (2)", " (3)"...
     """
     taken: Dict[str, Set[str]] = {}
+    entries = list(entries)
 
     def group(parent: str) -> Set[str]:
         return taken.setdefault("" if flat else norm(parent), set())
@@ -180,19 +201,8 @@ def allocate(
         parent, _, leaf = rel.rpartition("/")
         group(parent).add(norm(leaf))
 
-    todo = [e for e in entries if e.status == PENDING and not e.out_rel]
-    todo.sort(key=lambda e: (e.is_google, e.rel))
-    for e in todo:
+    def claim(e: Entry, candidates: List[str], base: str, ext: str) -> str:
         names = group(e.parent)
-        if e.is_google:
-            kind = google.KINDS[e.kind]
-            e.fmt = pick_format(kind, formats) or ""
-            base = google_base(e)
-            ext = "." + e.fmt
-            candidates = [base + ext, f"{base} (from {kind.label}){ext}"]
-        else:
-            base, ext = split_ext(e.name)
-            candidates = [e.name]
         chosen = next((c for c in candidates if norm(c) not in names), None)
         n = 2
         while chosen is None:
@@ -201,8 +211,29 @@ def allocate(
                 chosen = c
             n += 1
         names.add(norm(chosen))
-        e.renamed = chosen != candidates[0]
-        e.out_rel = chosen if flat or not e.parent else f"{e.parent}/{chosen}"
+        return chosen if flat or not e.parent else f"{e.parent}/{chosen}"
+
+    todo = [e for e in entries if e.status == PENDING and not e.out_rel]
+    todo.sort(key=lambda e: (e.is_google, e.rel))
+    for e in todo:
+        if e.is_google:
+            kind = google.KINDS[e.kind]
+            e.fmt = (wanted_formats(kind, formats) or [""])[0]
+            base, ext = google_base(e), "." + e.fmt
+            candidates = [base + ext, f"{base} (from {kind.label}){ext}"]
+        else:
+            base, ext = split_ext(e.name)
+            candidates = [e.name]
+        e.out_rel = claim(e, candidates, base, ext)
+        e.renamed = e.out_rel.rsplit("/", 1)[-1] != candidates[0]
+
+    for e in sorted((e for e in entries if e.is_google and e.out_rel and e.status in (PENDING, CONVERTED)), key=lambda e: e.rel):
+        kind = google.KINDS[e.kind]
+        for f in wanted_formats(kind, formats):
+            if f == e.fmt or f in e.extra:
+                continue
+            base, ext = google_base(e), "." + f
+            e.extra[f] = {"o": claim(e, [base + ext, f"{base} (from {kind.label}){ext}"], base, ext), "st": PENDING}
 
 
 def summary(entries: Iterable[Entry]) -> Dict[str, object]:

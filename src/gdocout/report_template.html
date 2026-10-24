@@ -102,7 +102,7 @@ const S = D.summary || {}, L = D.labels || {}, X = D.explain || {}, K = D.kinds 
 const ROWS = D.rows || [];
 const ATTN = new Set(["download_off","not_shared","not_found","no_offline_format","not_on_disk","unreadable","failed","pending","source_gone"]);
 const COLOR = {converted:"--ok",copied:"--ok",download_off:"--warn",not_shared:"--warn",not_found:"--bad",no_offline_format:"--vio",
-  not_on_disk:"--info",unreadable:"--bad",failed:"--bad",pending:"--grey",source_gone:"--grey",ignored:"--grey"};
+  not_on_disk:"--info",unreadable:"--bad",failed:"--bad",pending:"--grey",source_gone:"--grey",skipped:"--grey",ignored:"--grey"};
 const ORDER = Object.keys(L);
 const GROUPS = {
   "Documents":[".doc",".docx",".odt",".rtf",".pages",".dotx",".wpd"],
@@ -188,7 +188,7 @@ function match(r){
   if (state.type && r.t !== state.type) return false;
   if (state.ext && r.x !== state.ext) return false;
   if (state.renamed && !r.r) return false;
-  if (state.warned && !(r.w && r.w.length)) return false;
+  if (state.warned && !((r.w && r.w.length) || (r.x2 || []).some(x => x.st === "failed"))) return false;
   if (state.problems && !ATTN.has(r.st)) return false;
   if (state.q){ for (const w of state.q.split(/\s+/)) if (w && !r.lc.includes(w) && !(r.o||"").toLowerCase().includes(w)) return false; }
   return true; }
@@ -216,6 +216,11 @@ function rowEl(r){
   const out = el("td",null);
   if (r.o && (r.st === "converted" || r.st === "copied")){ out.append(el("a",{href:hrefRel(r.o)}, r.o.slice(r.o.lastIndexOf("/")+1))); if (r.r) out.append(el("div",{class:"path"},"renamed to avoid a clash")); }
   else if (r.o && r.st === "pending") out.append(el("span",{class:"path"}, "will be " + r.o.slice(r.o.lastIndexOf("/")+1)));
+  for (const x of (r.x2 || [])){
+    if (x.st === "converted") out.append(el("div",null, el("a",{href:hrefRel(x.o)}, x.o.slice(x.o.lastIndexOf("/")+1))));
+    else if (x.st === "failed") out.append(el("div",{class:"det"}, el("span",{class:"w"}, "⚠︎ ." + x.fm + " failed" + (x.n ? ": " + x.n : ""))));
+    else if (x.st === "pending") out.append(el("div",{class:"path"}, "." + x.fm + " not done yet"));
+  }
   if (r.l) out.append(el("div",null, el("a",{href:hrefRel(r.l), title:"a small page in the copy that links to the Google file"}, "link page")));
   const det = el("td",{class:"det"});
   if (r.n) det.append(el("div",null,r.n));
@@ -227,7 +232,7 @@ function rowEl(r){
   if (r.h) fx.push("SHA-256 " + r.h.slice(0,12) + "…");
   if (fx.length) det.append(el("div",{class:"facts"}, fx.join(" · ")));
   if (r.u) det.append(el("div",null, el("a",{href:r.u, target:"_blank", rel:"noopener noreferrer"}, "open in Google")));
-  return el("tr",null, el("td",null,st), file, el("td",null, r.t + (r.fm && r.k !== "file" ? " → ." + r.fm : "")), el("td",{class:"num"}, size(r.sz)), out, det);
+  return el("tr",null, el("td",null,st), file, el("td",null, r.t + (r.fm && r.k !== "file" ? " → ." + [r.fm].concat((r.x2||[]).map(x => x.fm)).join(" + .") : "")), el("td",{class:"num"}, size(r.sz)), out, det);
 }
 
 // controls

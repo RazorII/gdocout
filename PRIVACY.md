@@ -6,6 +6,7 @@ gdocout and its Claude plugin collect no data.
 - **No account, no sign-in, no cookies.** gdocout never asks for a Google password, never reads your browser's cookies, and keeps no cookies between requests.
 - **Your files stay on your computer.** Ordinary files are copied from one folder to another on your machine. The report, the copies and gdocout's own record of the run stay in the destination folder.
 - **gdocout sends nothing anywhere else.** No telemetry, no analytics, no crash reports.
+- **The window (`gdocout gui`) stays on your computer.** It's a page gdocout serves to your own browser at 127.0.0.1, which other computers can't reach. It lists folder names so you can choose folders, and runs the copy you set up there.
 - **Installing it** downloads gdocout from [GitHub](https://github.com/RazorII/gdocout); it has no dependencies to fetch.
 - **Claude itself is covered by Anthropic's privacy policy.** When you use gdocout through Claude, what Claude does with your conversation falls under [Anthropic's privacy policy](https://www.anthropic.com/legal/privacy), not this one.
 
