@@ -19,6 +19,7 @@ import html
 import os
 import re
 import socket
+import stat
 import time
 import urllib.error
 import urllib.request
@@ -119,6 +120,20 @@ class Http:
         return r
 
 
+def unhide(path: Path) -> None:
+    """Clear macOS's hidden flag on a file gdocout wrote.
+
+    iCloud Drive's file provider has been seen to flag freshly renamed files hidden,
+    which makes them vanish from Finder. A copy that can't be seen is no copy.
+    """
+    flags = getattr(os.stat(path), "st_flags", 0)
+    if flags & getattr(stat, "UF_HIDDEN", 0):
+        try:
+            os.chflags(path, flags & ~stat.UF_HIDDEN)
+        except OSError:
+            pass
+
+
 def _retry_after(value: Optional[str]) -> Optional[float]:
     if not value:
         return None
@@ -182,6 +197,7 @@ def export(http: Http, entry: Entry, dest: Path) -> Outcome:
                 return Outcome(OK, FAILED, note=note + (f" (the page said: {title})" if title else ""))
             size = part.stat().st_size
             os.replace(part, dest)
+            unhide(dest)
             if entry.mtime:
                 try:
                     os.utime(dest, (entry.mtime, entry.mtime))

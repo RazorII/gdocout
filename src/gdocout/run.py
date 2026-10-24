@@ -193,7 +193,7 @@ class _Run:
             self.stopped = self.pacer.stop_reason
             code = EXIT_THROTTLED
         summary = self._summary(entries)
-        report.write(self.dst / REPORT_NAME, list(entries.values()), summary)
+        fetch.unhide(report.write(self.dst / REPORT_NAME, list(entries.values()), summary))
         _write_manifest(self.dst / STATE_DIR, list(entries.values()), summary)
         self.state.set("summary", summary)
         self.state.commit()
@@ -301,6 +301,7 @@ class _Run:
             except OSError:
                 pass
             os.replace(part, dst)
+            fetch.unhide(dst)
             e.status, e.out_size, e.note = COPIED, st.st_size, ""
             e.facts = {"sha256": digest}
         except _Mismatch:
@@ -457,6 +458,7 @@ class _Run:
                 path = self.dst / e.link_rel
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(_link_page(e), encoding="utf-8")
+                fetch.unhide(path)
             except OSError:
                 e.link_rel = ""
 

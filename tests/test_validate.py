@@ -77,3 +77,20 @@ def test_pdf_needs_its_end_marker(tmp_path):
 def test_sha256(tmp_path):
     p = put(tmp_path, "x", b"abc")
     assert validate.sha256(p) == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+
+
+def test_written_files_are_never_left_hidden(tmp_path):
+    import os
+    import stat
+    import sys
+
+    import pytest
+
+    from gdocout import fetch
+
+    if not hasattr(stat, "UF_HIDDEN") or sys.platform != "darwin":
+        pytest.skip("macOS file flags")
+    p = put(tmp_path, "a.docx", b"x")
+    os.chflags(p, stat.UF_HIDDEN)
+    fetch.unhide(p)
+    assert not os.stat(p).st_flags & stat.UF_HIDDEN
