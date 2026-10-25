@@ -12,7 +12,7 @@ Turns Google Docs, Sheets and Slides into Word, Excel and PowerPoint files witho
 ## What the plugin runs and connects to
 
 - **The plugin is one skill**: instructions that tell Claude how to use the `gdocout` command. It has no hooks, no MCP servers and no background processes.
-- **It runs one command, `gdocout`**: Python, standard library only, MIT licensed, source at [github.com/RazorII/gdocout](https://github.com/RazorII/gdocout). If it isn't installed, Claude installs the release this plugin belongs to, pinned to its tag (`git+https://github.com/RazorII/gdocout@v0.1.0`), with uv, pipx or pip.
+- **It runs one command, `gdocout`**: Python, standard library only, MIT licensed, source at [github.com/RazorII/gdocout](https://github.com/RazorII/gdocout). If it isn't installed, Claude installs the release this plugin belongs to, pinned to its tag (`git+https://github.com/RazorII/gdocout@v0.1.1`), with uv, pipx or pip.
 - **It connects to these sites and no others:**
   - `docs.google.com`: Google's own download links for Docs, Sheets, Slides and Drawings, and, when Google refuses one, that file's view page once, to tell "download turned off" from "not shared".
   - `*.googleusercontent.com`: where Google serves those downloads from (it redirects there).

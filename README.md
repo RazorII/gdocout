@@ -26,7 +26,7 @@ Then it writes **`gdocout-report.html`** into the copy: one self-contained page 
 ## Install
 
 ```
-uv tool install git+https://github.com/RazorII/gdocout@v0.1.0
+uv tool install git+https://github.com/RazorII/gdocout@v0.1.1
 ```
 
 (or `pipx install …`, or `python3 -m pip install --user …`). Python 3.9 or newer, no other dependencies. macOS, Windows and Linux.

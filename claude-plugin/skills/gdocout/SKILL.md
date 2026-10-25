@@ -7,7 +7,7 @@ description: Turn Google Docs, Sheets and Slides into Word, Excel and PowerPoint
 
 gdocout downloads Google Docs, Sheets and Slides in Office formats through the same links Google's own Download menu uses. Files shared "anyone with the link" need **no sign-in at all**. Files that aren't shared that way can come through the **user's own web browser**, when it's signed in to Google with an account that can open them; gdocout never sees a password or a cookie. Whatever can't be fetched either way is reported, never guessed at. Every download is checked before it counts, because Google answers errors with a web page that can look like a success.
 
-This skill needs **gdocout 0.1.0 or newer**. gdocout has no dependencies beyond Python 3.9+.
+This skill needs **gdocout 0.1.1 or newer**. gdocout has no dependencies beyond Python 3.9+.
 
 ## 1. Find gdocout, or install it
 
@@ -16,14 +16,14 @@ uv and pipx put the command in `~/.local/bin`, which often isn't on the shell's 
 1. `gdocout --version`
 2. If that's not found: `~/.local/bin/gdocout --version` (on Windows, `%USERPROFILE%\.local\bin\gdocout.exe --version`), or `"$(uv tool dir --bin)/gdocout" --version` when uv is installed.
 
-Use whichever works for everything below. If it reports a version older than 0.1.0, reinstall this release over it: `uv tool install --force git+https://github.com/RazorII/gdocout@v0.1.0` (or the same with `pipx install --force`).
+Use whichever works for everything below. If it reports a version older than 0.1.1, reinstall this release over it: `uv tool install --force git+https://github.com/RazorII/gdocout@v0.1.1` (or the same with `pipx install --force`).
 
 Only if none of them works, install this release. Prefer uv, then pipx, then pip:
 
 ```
-uv tool install git+https://github.com/RazorII/gdocout@v0.1.0
-pipx install git+https://github.com/RazorII/gdocout@v0.1.0
-python3 -m pip install --user git+https://github.com/RazorII/gdocout@v0.1.0
+uv tool install git+https://github.com/RazorII/gdocout@v0.1.1
+pipx install git+https://github.com/RazorII/gdocout@v0.1.1
+python3 -m pip install --user git+https://github.com/RazorII/gdocout@v0.1.1
 ```
 
 ## 2. One link, or a few

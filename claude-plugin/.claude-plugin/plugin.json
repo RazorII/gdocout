@@ -1,7 +1,7 @@
 {
   "name": "gdocout",
   "displayName": "gdocout",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Turn Google Docs, Sheets and Slides into Word, Excel and PowerPoint files without giving anything your Google password: one link, or a whole Google Drive saved offline, with a filterable report of every file and why any couldn't be saved.",
   "author": {
     "name": "RazorII",
