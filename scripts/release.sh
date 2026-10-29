@@ -15,7 +15,13 @@ grep -q "__version__ = \"$v\"" src/gdocout/__init__.py || { echo "src/gdocout/__
 publisher="RazorII"
 names="$( { git log --format='%an%n%cn'; git config user.name; } | sort -u)"
 [ "$names" = "$publisher" ] || { echo "commits and the tag must be by $publisher (git config user.name $publisher); found: $(echo $names)" >&2; exit 1; }
-git tag -a "v$v" -m "gdocout $v"
-git push origin HEAD "refs/tags/v$v"
+# A rerun after a failed push finds its own annotated tag already at HEAD and pushes it again. A tag anywhere
+# else, or a lightweight one, still stops here: git tag -a refuses to replace it.
+if [ "$(git cat-file -t "refs/tags/v$v" 2>/dev/null)" != tag ] || [ "$(git rev-parse "refs/tags/v$v^{commit}")" != "$(git rev-parse HEAD)" ]; then
+  git tag -a "v$v" -m "gdocout $v"
+fi
+# --atomic: main and the tag land together or not at all, so a refused tag can't leave main published
+# without its release (installs pin to the tag).
+git push --atomic origin HEAD "refs/tags/v$v"
 git ls-remote --exit-code --tags origin "refs/tags/v$v" >/dev/null || { echo "v$v did not reach GitHub" >&2; exit 1; }
 echo "v$v is on GitHub"
