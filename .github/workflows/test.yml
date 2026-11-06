@@ -36,3 +36,14 @@ jobs:
         env:
           GDOCOUT_NETWORK_TESTS: "1"
         run: python -m pytest -v tests/test_network.py
+
+  # One check that says every test job above passed: the one to read before a pull request is merged.
+  ci-ok:
+    if: always()
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every test job passed
+        run: |
+          echo "test jobs: ${{ needs.test.result }}"
+          [ "${{ needs.test.result }}" = success ]

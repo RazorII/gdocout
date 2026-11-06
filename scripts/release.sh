@@ -11,9 +11,18 @@ grep -q "__version__ = \"$v\"" src/gdocout/__init__.py || { echo "src/gdocout/__
 "${PYTHON:-python3}" -m pytest -q -p no:cacheprovider tests/test_release.py
 [ -z "$(git status --porcelain)" ] || { echo "commit everything first" >&2; exit 1; }
 # gdocout is published as RazorII. A fresh clone takes the global git name, so
-# check every commit and the name the tag will carry before anything is pushed.
+# check every commit that isn't on GitHub yet, and the name the tag will carry,
+# before anything is pushed. What GitHub's main already has stays as it is:
+# contributors' merged pull requests keep their own names, under the merge
+# commit GitHub wrote.
 publisher="RazorII"
-names="$( { git log --format='%an%n%cn'; git config user.name; } | sort -u)"
+range=HEAD
+if git ls-remote --exit-code --heads origin main >/dev/null; then
+  git fetch --quiet origin main
+  git merge-base --is-ancestor FETCH_HEAD HEAD || { echo "GitHub's main has commits this checkout lacks (a merged pull request?): git pull --ff-only origin main first" >&2; exit 1; }
+  range=FETCH_HEAD..HEAD
+fi
+names="$( { git log --format='%an%n%cn' "$range"; git config user.name; } | sort -u)"
 [ "$names" = "$publisher" ] || { echo "commits and the tag must be by $publisher (git config user.name $publisher); found: $(echo $names)" >&2; exit 1; }
 # A rerun after a failed push finds its own annotated tag already at HEAD and pushes it again. A tag anywhere
 # else, or a lightweight one, still stops here: git tag -a refuses to replace it.
