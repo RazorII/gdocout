@@ -115,6 +115,10 @@ Files are written under a temporary name and only renamed into place after they 
 
 Older files shared by link before Google's 2021 security update carry a *resource key* in their shortcut file; gdocout sends it along, both in the link and in the header Google documents for it.
 
+## Questions, bugs and changes
+
+Ask questions in [Discussions](https://github.com/RazorII/gdocout/discussions/categories/q-a). Report bugs in [Issues](https://github.com/RazorII/gdocout/issues). To fix something yourself, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Privacy
 
 gdocout talks only to Google, sends only the IDs of the files it downloads, keeps no cookies and needs no account. See [PRIVACY.md](PRIVACY.md).
